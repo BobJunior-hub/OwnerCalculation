@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.ant-btn-primary:hover:not(:disabled) {
+  background-color: #F59A6B !important;
+  border-color: #F59A6B !important;
+}
+
+.ant-btn-primary:focus:not(:disabled) {
+  background-color: #F59A6B !important;
+  border-color: #F59A6B !important;
+}
+
+.ant-btn:hover:not(:disabled):not(.ant-btn-primary) {
+  border-color: #F59A6B !important;
+  color: #F59A6B !important;
+}
+
+.ant-btn-text:hover:not(:disabled) {
+  background-color: rgba(231, 120, 67, 0.1) !important;
+  color: #F59A6B !important;
+}
+
+
