@@ -1,9 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { Drawer, Form, Input, Button, Select, InputNumber, App, Spin } from 'antd';
-import { CloseOutlined, SaveOutlined, LoadingOutlined } from '@ant-design/icons';
-const { TextArea } = Input;
-import { useTheme } from './menu';
+import { CloseOutlined, SaveOutlined } from '@ant-design/icons';
+import { App, Button, Drawer, Form, Input, InputNumber, Select, Spin } from 'antd';
+import React, { useEffect, useState } from 'react';
 import { apiRequest, getAuthToken } from './api';
+import { useTheme } from './menu';
+import { useQueryClient } from '@tanstack/react-query';
+import { useGetTrucks } from './services/query/useGetTrucks';
+const { TextArea } = Input;
+
 
 const DeductionDrawer = ({ open, onClose, onSuccess, calculation }) => {
   const { message } = App.useApp();
@@ -14,6 +17,9 @@ const DeductionDrawer = ({ open, onClose, onSuccess, calculation }) => {
   const [allTrucks, setAllTrucks] = useState([]);
   const [loadingTrucks, setLoadingTrucks] = useState(false);
   const currentTheme = useTheme();
+  const queryClient = useQueryClient();
+  const { data: trucks, isLoading, isError } = useGetTrucks();
+
 
   useEffect(() => {
     const fetchAllTrucks = async () => {
@@ -23,8 +29,8 @@ const DeductionDrawer = ({ open, onClose, onSuccess, calculation }) => {
       try {
         setLoadingTrucks(true);
         const result = await apiRequest('/calculations/all-trucks');
-        
-        
+
+
         let trucksList = [];
         if (Array.isArray(result)) {
           trucksList = result;
@@ -34,7 +40,7 @@ const DeductionDrawer = ({ open, onClose, onSuccess, calculation }) => {
             trucksList = Object.values(trucksList);
           }
         }
-        
+
         setAllTrucks(Array.isArray(trucksList) ? trucksList : []);
       } catch (err) {
         console.error('Error fetching trucks:', err);
@@ -50,9 +56,9 @@ const DeductionDrawer = ({ open, onClose, onSuccess, calculation }) => {
     if (open && calculation) {
       form.resetFields();
       setDriverData(null);
-      
+
       const ownerId = calculation.id || null;
-      
+
       if (ownerId) {
         form.setFieldsValue({ owner: ownerId });
       }
@@ -80,10 +86,10 @@ const DeductionDrawer = ({ open, onClose, onSuccess, calculation }) => {
       });
 
       const result = await apiRequest(`/calculations/statement-by-driver/?${params.toString()}`);
-      
+
       if (result && Array.isArray(result) && result.length > 0) {
         const fetchedDriverData = result[0];
-        
+
         let driverName = '';
         if (fetchedDriverData.driver) {
           if (typeof fetchedDriverData.driver === 'object' && fetchedDriverData.driver.name) {
@@ -94,7 +100,7 @@ const DeductionDrawer = ({ open, onClose, onSuccess, calculation }) => {
         } else {
           driverName = fetchedDriverData.driver_name || '';
         }
-        
+
         const amount = fetchedDriverData.total_amount || fetchedDriverData.amount || 0;
         const escrow = fetchedDriverData.escrow || fetchedDriverData.total_escrow || 0;
 
@@ -122,7 +128,7 @@ const DeductionDrawer = ({ open, onClose, onSuccess, calculation }) => {
         } else {
           driverName = result.driver_name || '';
         }
-        
+
         const amount = result.total_amount || result.amount || 0;
         const escrow = result.escrow || result.total_escrow || 0;
 
@@ -199,7 +205,7 @@ const DeductionDrawer = ({ open, onClose, onSuccess, calculation }) => {
     }
 
     const ownerId = calculation.id || null;
-    
+
     if (!ownerId) {
       message.error('Owner ID is missing from calculation');
       return;
@@ -278,7 +284,7 @@ const DeductionDrawer = ({ open, onClose, onSuccess, calculation }) => {
       console.log('Owner Name:', calculation.owner);
       console.log('Sending POST request to /calculations/calculation-unit/ with payload:', calculationUnitPayload);
 
-      await apiRequest('/calculations/calculation-unit/', {
+      const createdDeduction = await apiRequest('/calculations/calculation-unit/', {
         method: 'POST',
         body: JSON.stringify(calculationUnitPayload),
       });
@@ -290,7 +296,8 @@ const DeductionDrawer = ({ open, onClose, onSuccess, calculation }) => {
       setDriverData(null);
       onClose();
       if (onSuccess) {
-        onSuccess();
+        onSuccess(createdDeduction);
+        queryClient.invalidateQueries({ queryKey: ['owner'] });
       }
     } catch (error) {
       console.error('Error creating deduction:', error);
@@ -306,12 +313,12 @@ const DeductionDrawer = ({ open, onClose, onSuccess, calculation }) => {
     onClose();
   };
 
-  const truckOptions = allTrucks.map((truck) => {
+  const truckOptions = trucks?.map((truck) => {
     const truckId = truck.id || truck._id;
     const unitNumber = truck.unit_number || 'N/A';
     const vin = truck.VIN || truck.vin || 'N/A';
     const label = `${unitNumber} (VIN: ${vin})`;
-    
+
     return {
       value: truckId,
       label: label,
@@ -321,8 +328,8 @@ const DeductionDrawer = ({ open, onClose, onSuccess, calculation }) => {
   if (!calculation) return null;
 
   const ownerId = calculation.owner_id || (calculation.owner && typeof calculation.owner === 'number' ? calculation.owner : null);
-  
-  const periodInfo = calculation.start_date && calculation.end_date 
+
+  const periodInfo = calculation.start_date && calculation.end_date
     ? `${calculation.start_date} to ${calculation.end_date}`
     : 'Period not specified';
 
@@ -377,17 +384,16 @@ const DeductionDrawer = ({ open, onClose, onSuccess, calculation }) => {
         <Form.Item
           name="truck"
           label={<span className={currentTheme === 'dark' ? 'text-white/70' : 'text-black/70'}>Truck ID</span>}
-          rules={[{ required: true, message: 'Please select a truck' }]}
-        >
+          rules={[{ required: true, message: 'Please select a truck' }]}>
           <Select
+            loading={isLoading}
             placeholder="Select Truck"
             showSearch
             filterOption={(input, option) =>
               (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
             }
             onChange={handleTruckChange}
-            options={truckOptions}
-          />
+            options={truckOptions}/>
         </Form.Item>
 
         {loadingDriver && (

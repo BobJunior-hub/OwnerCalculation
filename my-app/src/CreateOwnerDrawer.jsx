@@ -36,11 +36,11 @@ const CreateOwnerDrawer = ({ open, onClose, onSuccess, owners }) => {
     if (!getAuthToken()) {
       return;
     }
-    
+
     setLoadingTrucks(true);
     try {
       const result = await apiRequest('/calculations/all-trucks');
-      
+
       let trucksList = [];
       if (Array.isArray(result)) {
         trucksList = result;
@@ -50,7 +50,7 @@ const CreateOwnerDrawer = ({ open, onClose, onSuccess, owners }) => {
           trucksList = Object.values(trucksList);
         }
       }
-      
+
       setAllTrucks(Array.isArray(trucksList) ? trucksList : []);
     } catch (err) {
       message.error('Failed to load trucks. Please try again.');
@@ -124,8 +124,8 @@ const CreateOwnerDrawer = ({ open, onClose, onSuccess, owners }) => {
     if (driverId) {
       await fetchDriverData(newItem, driverId);
     } else {
-      setTrucksData(prev => prev.map(item => 
-        item.truckId === newItem.truckId 
+      setTrucksData(prev => prev.map(item =>
+        item.truckId === newItem.truckId
           ? { ...item, status: 'manual' }
           : item
       ));
@@ -148,7 +148,7 @@ const CreateOwnerDrawer = ({ open, onClose, onSuccess, owners }) => {
     } else {
       driverName = data.driver_name || '';
     }
-    
+
     let companyName = '';
     if (data.company) {
       if (typeof data.company === 'object' && data.company.name) {
@@ -159,7 +159,7 @@ const CreateOwnerDrawer = ({ open, onClose, onSuccess, owners }) => {
     } else {
       companyName = data.company_name || data.carrier_company || '';
     }
-    
+
     return {
       driverName,
       companyName,
@@ -171,8 +171,8 @@ const CreateOwnerDrawer = ({ open, onClose, onSuccess, owners }) => {
 
   const fetchDriverData = async (item, driverId) => {
     if (!driverId || !dateRange || !dateRange[0] || !dateRange[1]) {
-      setTrucksData(prev => prev.map(current => 
-        current.truckId === item.truckId 
+      setTrucksData(prev => prev.map(current =>
+        current.truckId === item.truckId
           ? { ...current, status: 'manual' }
           : current
       ));
@@ -200,8 +200,8 @@ const CreateOwnerDrawer = ({ open, onClose, onSuccess, owners }) => {
       if (driverData) {
         const { driverName, companyName, amount, note, statementId } = extractDriverInfo(driverData);
 
-        setTrucksData(prev => prev.map(current => 
-          current.truckId === item.truckId 
+        setTrucksData(prev => prev.map(current =>
+          current.truckId === item.truckId
             ? {
                 ...current,
                 status: 'fetched',
@@ -214,19 +214,19 @@ const CreateOwnerDrawer = ({ open, onClose, onSuccess, owners }) => {
               }
             : current
         ));
-        
+
         message.success(`Driver statement data loaded for Unit ${item.unitNumber}`);
       } else {
-        setTrucksData(prev => prev.map(current => 
-          current.truckId === item.truckId 
+        setTrucksData(prev => prev.map(current =>
+          current.truckId === item.truckId
             ? { ...current, status: 'manual' }
             : current
         ));
         message.info(`No driver statement found for Unit ${item.unitNumber}. Please fill the fields manually.`);
       }
     } catch (error) {
-      setTrucksData(prev => prev.map(current => 
-        current.truckId === item.truckId 
+      setTrucksData(prev => prev.map(current =>
+        current.truckId === item.truckId
           ? { ...current, status: 'manual' }
           : current
       ));
@@ -248,7 +248,7 @@ const CreateOwnerDrawer = ({ open, onClose, onSuccess, owners }) => {
   };
 
   const updateTruckData = (truckId, field, value) => {
-    setTrucksData(prev => prev.map(item => 
+    setTrucksData(prev => prev.map(item =>
       item.truckId === truckId ? { ...item, [field]: value } : item
     ));
   };
@@ -259,13 +259,13 @@ const CreateOwnerDrawer = ({ open, onClose, onSuccess, owners }) => {
       const statementId = unit.statement?.id || unit.statement || unit.statement_id;
       const amount = typeof unit.amount === 'string' ? unit.amount : String(unit.amount || '0.00');
       const escrow = typeof unit.escrow === 'string' ? unit.escrow : String(unit.escrow || '0.00');
-      
+
       const formattedUnit = {
         truck: Number(truckId),
         amount,
         escrow,
       };
-      
+
       if (unit.driver && unit.driver.trim()) {
         formattedUnit.driver = unit.driver.trim();
       }
@@ -277,7 +277,7 @@ const CreateOwnerDrawer = ({ open, onClose, onSuccess, owners }) => {
       } else {
         formattedUnit.note = '';
       }
-      
+
       return formattedUnit;
     });
   };
@@ -290,13 +290,13 @@ const CreateOwnerDrawer = ({ open, onClose, onSuccess, owners }) => {
         end_date: endDate,
       });
       const existingCalculations = await apiRequest(`/calculations/owner-calculation/?${checkParams.toString()}`);
-      
+
       if (!existingCalculations) return null;
-      
+
       const calculations = Array.isArray(existingCalculations)
         ? existingCalculations
         : (existingCalculations.results || []);
-      
+
       return calculations.find(
         (c) =>
           (c.owner === owner || c.owner?.id === owner) &&
@@ -349,7 +349,7 @@ const CreateOwnerDrawer = ({ open, onClose, onSuccess, owners }) => {
         }
 
         const truckId = Number(truck.id || truck._id);
-        
+
         let amountValue = 0;
         if (item.amount) {
           if (typeof item.amount === 'string') {
@@ -359,7 +359,7 @@ const CreateOwnerDrawer = ({ open, onClose, onSuccess, owners }) => {
             amountValue = parseFloat(item.amount) || 0;
           }
         }
-        
+
         let escrowValue = 0;
         if (item.escrow !== null && item.escrow !== undefined && item.escrow !== '') {
           if (typeof item.escrow === 'string') {
@@ -458,7 +458,7 @@ const CreateOwnerDrawer = ({ open, onClose, onSuccess, owners }) => {
 
           message.success('Calculation created successfully!');
         } catch (postError) {
-          const isAlreadyExistsError = postError?.message?.includes('already exists') || 
+          const isAlreadyExistsError = postError?.message?.includes('already exists') ||
                                      postError?.response?.error?.includes('already exists') ||
                                      postError?.response?.detail?.includes('already exists');
 
@@ -837,7 +837,7 @@ const CreateOwnerDrawer = ({ open, onClose, onSuccess, owners }) => {
                   filterOption={(input, option) => {
                         const label = option?.label ?? '';
                         const searchText = input.toLowerCase();
-                        return label.toLowerCase().includes(searchText) || 
+                        return label.toLowerCase().includes(searchText) ||
                                (option?.vin && option.vin.toLowerCase().includes(searchText)) ||
                                (option?.unitNumber && option.unitNumber.toLowerCase().includes(searchText));
                   }}

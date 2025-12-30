@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { Drawer, Spin, Empty, Button, Modal, App } from 'antd';
 import { DeleteOutlined } from '@ant-design/icons';
-import { useTheme } from './menu';
+import { useQueryClient } from '@tanstack/react-query';
+import { App, Button, Drawer } from 'antd';
+import React, { useEffect, useState } from 'react';
 import { apiRequest } from './api';
 
 const ViewOwnerCalculationDrawer = ({ open, onClose, calculation, currentTheme, onRefresh }) => {
@@ -10,6 +10,9 @@ const ViewOwnerCalculationDrawer = ({ open, onClose, calculation, currentTheme, 
   const [loadingDeductions, setLoadingDeductions] = useState(false);
   const [trucksMap, setTrucksMap] = useState({});
   const [deletingId, setDeletingId] = useState(null);
+  const [deletedUnitIds, setDeletedUnitIds] = useState(new Set());
+  const [newlyAddedUnits, setNewlyAddedUnits] = useState([]);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     const fetchTrucks = async () => {
@@ -65,16 +68,16 @@ const ViewOwnerCalculationDrawer = ({ open, onClose, calculation, currentTheme, 
 
         const expectedStartDate = normalizeDate(calculation.start_date);
         const expectedEndDate = normalizeDate(calculation.end_date);
-        
+
         const ownerName = calculation.owner || (calculation.calculations && calculation.calculations.length > 0 ? calculation.calculations[0].owner : null);
-        
+
         if (!ownerName) {
           console.warn('Could not find owner name in calculation object. Available fields:', Object.keys(calculation));
           setDeductions([]);
           setLoadingDeductions(false);
           return;
         }
-        
+
         console.log('=== Fetching Owner Calculations to Match Deductions ===');
         console.log('Raw calculation dates:', {
           start_date: calculation.start_date,
@@ -88,7 +91,7 @@ const ViewOwnerCalculationDrawer = ({ open, onClose, calculation, currentTheme, 
         console.log('Owner Name:', ownerName);
 
         const ownerCalcResult = await apiRequest(`/calculations/owner-calculation/?search=${encodeURIComponent(ownerName)}`);
-        
+
         let allOwnerCalculations = [];
         if (ownerCalcResult && Array.isArray(ownerCalcResult)) {
           allOwnerCalculations = ownerCalcResult;
@@ -97,14 +100,14 @@ const ViewOwnerCalculationDrawer = ({ open, onClose, calculation, currentTheme, 
         }
 
         console.log('Total owner calculations fetched:', allOwnerCalculations.length);
-        
+
         if (allOwnerCalculations.length === 0) {
           console.warn('No owner calculations found');
           setDeductions([]);
           setLoadingDeductions(false);
           return;
         }
-        
+
         let ownerId = null;
         for (const calc of allOwnerCalculations) {
           if (calc.calculation_units && Array.isArray(calc.calculation_units) && calc.calculation_units.length > 0) {
@@ -115,16 +118,16 @@ const ViewOwnerCalculationDrawer = ({ open, onClose, calculation, currentTheme, 
             }
           }
         }
-        
+
         if (!ownerId) {
           console.warn('Could not find owner ID from owner-calculation response. Using owner name as fallback.');
           ownerId = ownerName;
         }
-        
+
         console.log('Using owner ID for calculation-unit query:', ownerId);
-        
+
         const calculationUnitsResult = await apiRequest(`/calculations/calculation-unit/?owner=${ownerId}`);
-        
+
         let allCalculationUnits = [];
         if (calculationUnitsResult && Array.isArray(calculationUnitsResult)) {
           allCalculationUnits = calculationUnitsResult;
@@ -133,16 +136,16 @@ const ViewOwnerCalculationDrawer = ({ open, onClose, calculation, currentTheme, 
         }
 
         console.log('Total calculation units fetched:', allCalculationUnits.length);
-        
+
         const allDeductionsFromAPI = allCalculationUnits.filter(u => u && (u.statement === null || u.statement === undefined));
         console.log('Total deductions from API (statement === null):', allDeductionsFromAPI.length);
-        
+
         const deductionIdToWeekMap = {};
-        
+
         allOwnerCalculations.forEach(calc => {
           const calcStartDate = normalizeDate(calc.start_date);
           const calcEndDate = normalizeDate(calc.end_date);
-          
+
           if (calc.calculation_units && Array.isArray(calc.calculation_units)) {
             calc.calculation_units.forEach(unit => {
               if (unit && unit.id && (unit.statement === null || unit.statement === undefined)) {
@@ -157,7 +160,7 @@ const ViewOwnerCalculationDrawer = ({ open, onClose, calculation, currentTheme, 
             });
           }
         });
-        
+
         allCalculationUnits.forEach(unit => {
           if (unit && unit.id && (unit.statement === null || unit.statement === undefined)) {
             if (unit.start_date && unit.end_date) {
@@ -173,16 +176,16 @@ const ViewOwnerCalculationDrawer = ({ open, onClose, calculation, currentTheme, 
             }
           }
         });
-        
+
         console.log('Deduction mapping after adding API units:', Object.keys(deductionIdToWeekMap).length);
         console.log('Mapping details:', Object.entries(deductionIdToWeekMap).map(([id, info]) => ({
           id: id,
           start_date: info.start_date,
           end_date: info.end_date
         })));
-        
+
         console.log('Deduction to week mapping created:', Object.keys(deductionIdToWeekMap).length, 'deductions mapped');
-        
+
         allDeductionsFromAPI.forEach(ded => {
           const hasOwnDates = !!(ded.start_date && ded.end_date);
           const hasWeekInfo = !!deductionIdToWeekMap[ded.id];
@@ -201,50 +204,50 @@ const ViewOwnerCalculationDrawer = ({ open, onClose, calculation, currentTheme, 
           deductionId: id,
           week: `${info.start_date} to ${info.end_date}`
         })));
-        
+
         console.log('=== Filtering Deductions ===');
         console.log('Expected week:', expectedStartDate, 'to', expectedEndDate);
-        
+
         const filteredDeductions = allCalculationUnits.filter(unit => {
           if (!unit) {
             return false;
           }
-          
+
           const isStatementNull = unit.statement === null || unit.statement === undefined;
-          
+
           if (!isStatementNull) {
             return false;
           }
-          
+
           const unitMatchesOwnerCalc = allOwnerCalculations.some(calc => {
             if (calc.calculation_units && Array.isArray(calc.calculation_units)) {
               return calc.calculation_units.some(cu => cu.id === unit.id);
             }
             return false;
           });
-          
+
           const weekInfoForMatch = deductionIdToWeekMap[unit.id];
-          const unitMatchesWeek = weekInfoForMatch && 
+          const unitMatchesWeek = weekInfoForMatch &&
             String(weekInfoForMatch.start_date || '').trim() === String(expectedStartDate || '').trim() &&
             String(weekInfoForMatch.end_date || '').trim() === String(expectedEndDate || '').trim();
-          
+
           if (!unitMatchesOwnerCalc && !unitMatchesWeek) {
             return false;
           }
-          
+
           let unitStartDate = null;
           let unitEndDate = null;
-          
+
           if (unit.start_date && unit.end_date) {
             unitStartDate = normalizeDate(unit.start_date);
             unitEndDate = normalizeDate(unit.end_date);
           }
-          
+
           const weekInfo = deductionIdToWeekMap[unit.id];
-          
+
           let matchesStartDate = false;
           let matchesEndDate = false;
-          
+
           if (unitStartDate && unitEndDate) {
             matchesStartDate = unitStartDate === expectedStartDate;
             matchesEndDate = unitEndDate === expectedEndDate;
@@ -253,10 +256,10 @@ const ViewOwnerCalculationDrawer = ({ open, onClose, calculation, currentTheme, 
             const weekEndDate = String(weekInfo.end_date || '').trim();
             const expStartDate = String(expectedStartDate || '').trim();
             const expEndDate = String(expectedEndDate || '').trim();
-            
+
             matchesStartDate = weekStartDate === expStartDate;
             matchesEndDate = weekEndDate === expEndDate;
-            
+
             if (unit.id === 23) {
               console.log('Debugging deduction 23:', {
                 weekStartDate: weekStartDate,
@@ -271,17 +274,17 @@ const ViewOwnerCalculationDrawer = ({ open, onClose, calculation, currentTheme, 
           } else {
             return false;
           }
-          
+
           return matchesStartDate && matchesEndDate;
         });
-        
+
         const calculationDeductions = [];
         if (calculation.calculations && Array.isArray(calculation.calculations)) {
           calculation.calculations.forEach(calc => {
             const calcStartDate = normalizeDate(calc.start_date);
             const calcEndDate = normalizeDate(calc.end_date);
             const calcMatchesWeek = calcStartDate === expectedStartDate && calcEndDate === expectedEndDate;
-            
+
             if (calcMatchesWeek && calc.calculation_units && Array.isArray(calc.calculation_units)) {
               calc.calculation_units.forEach(unit => {
                 if (unit && unit.id && (unit.statement === null || unit.statement === undefined)) {
@@ -296,7 +299,7 @@ const ViewOwnerCalculationDrawer = ({ open, onClose, calculation, currentTheme, 
           const calcStartDate = normalizeDate(calculation.start_date);
           const calcEndDate = normalizeDate(calculation.end_date);
           const calcMatchesWeek = calcStartDate === expectedStartDate && calcEndDate === expectedEndDate;
-          
+
           if (calcMatchesWeek) {
             calculation.calculation_units.forEach(unit => {
               if (unit && unit.id && (unit.statement === null || unit.statement === undefined)) {
@@ -307,14 +310,14 @@ const ViewOwnerCalculationDrawer = ({ open, onClose, calculation, currentTheme, 
             });
           }
         }
-        
+
         const allDeductions = [...filteredDeductions];
         calculationDeductions.forEach(calcDed => {
           if (!allDeductions.find(d => d.id === calcDed.id)) {
             allDeductions.push(calcDed);
           }
         });
-        
+
         allCalculationUnits.forEach(unit => {
           if (unit && unit.id && (unit.statement === null || unit.statement === undefined)) {
             const weekInfo = deductionIdToWeekMap[unit.id];
@@ -323,7 +326,7 @@ const ViewOwnerCalculationDrawer = ({ open, onClose, calculation, currentTheme, 
               const weekEndDate = String(weekInfo.end_date || '').trim();
               const expStartDate = String(expectedStartDate || '').trim();
               const expEndDate = String(expectedEndDate || '').trim();
-              
+
               if (weekStartDate === expStartDate && weekEndDate === expEndDate) {
                 if (!allDeductions.find(d => d.id === unit.id)) {
                   allDeductions.push(unit);
@@ -332,7 +335,7 @@ const ViewOwnerCalculationDrawer = ({ open, onClose, calculation, currentTheme, 
             }
           }
         });
-        
+
         console.log('=== Deduction Filtering Results ===');
         console.log('Week being viewed:', expectedStartDate, 'to', expectedEndDate);
         console.log('Total calculation units from API:', allCalculationUnits.length);
@@ -346,7 +349,7 @@ const ViewOwnerCalculationDrawer = ({ open, onClose, calculation, currentTheme, 
           console.log('Total deductions from API (all weeks):', allDeductionsCheck.length);
           console.log('Expected week:', expectedStartDate, 'to', expectedEndDate);
           console.log('Calculation owner ID:', ownerId);
-          
+
           allDeductionsCheck.forEach((unit, idx) => {
             const unitOwnerId = typeof unit.owner === 'number' ? unit.owner : (typeof unit.owner === 'object' && unit.owner?.id ? unit.owner.id : null);
             const unitStartDate = unit.start_date ? normalizeDate(unit.start_date) : null;
@@ -356,7 +359,7 @@ const ViewOwnerCalculationDrawer = ({ open, onClose, calculation, currentTheme, 
             const finalEndDate = unitEndDate || weekInfo?.end_date || 'unknown';
             const ownerMatches = unitOwnerId === calcOwnerId;
             const datesMatch = (finalStartDate === expectedStartDate && finalEndDate === expectedEndDate);
-            
+
             console.log(`Deduction ${idx + 1} from API:`, {
               id: unit.id,
               driver: unit.driver,
@@ -388,8 +391,18 @@ const ViewOwnerCalculationDrawer = ({ open, onClose, calculation, currentTheme, 
   };
 
   useEffect(() => {
-    fetchDeductions();
+    if (open && calculation) {
+      fetchDeductions();
+      setDeletedUnitIds(new Set());
+      setNewlyAddedUnits([]);
+    }
   }, [open, calculation]);
+
+  useEffect(() => {
+    if (open && calculation) {
+      fetchDeductions();
+    }
+  }, [calculation?.calculation_units?.length]);
 
   if (!calculation) return null;
 
@@ -415,18 +428,22 @@ const ViewOwnerCalculationDrawer = ({ open, onClose, calculation, currentTheme, 
 
   const isPeriodView = calculation.calculations && Array.isArray(calculation.calculations);
   const calculationsList = isPeriodView ? calculation.calculations : [calculation];
-  
+
   const allCalculationUnits = [];
   calculationsList.forEach(calc => {
     if (calc.calculation_units && Array.isArray(calc.calculation_units)) {
-      allCalculationUnits.push(...calc.calculation_units);
+      calc.calculation_units.forEach(unit => {
+        if (unit && !deletedUnitIds.has(unit.id)) {
+          allCalculationUnits.push(unit);
+        }
+      });
     }
   });
 
-  const statementsOnly = allCalculationUnits.filter(unit => {
-    if (!unit) return false;
-    const hasPdfFile = unit.statement?.pdf_file || unit.statement?.pdf_file_url;
-    return hasPdfFile;
+  newlyAddedUnits.forEach(unit => {
+    if (unit && !deletedUnitIds.has(unit.id) && !allCalculationUnits.find(u => u.id === unit.id)) {
+      allCalculationUnits.push(unit);
+    }
   });
 
   const normalizeDate = (date) => {
@@ -438,7 +455,7 @@ const ViewOwnerCalculationDrawer = ({ open, onClose, calculation, currentTheme, 
     return dateStr;
   };
 
-  const weekDeductions = deductions;
+  const weekDeductions = deductions.filter(d => !deletedUnitIds.has(d.id));
 
   const handleDeleteDeduction = (deductionId) => {
     modal.confirm({
@@ -449,27 +466,21 @@ const ViewOwnerCalculationDrawer = ({ open, onClose, calculation, currentTheme, 
       cancelText: 'Cancel',
       onOk: async () => {
         setDeletingId(deductionId);
+        setDeductions(prev => prev.filter(d => d.id !== deductionId));
+
         try {
           await apiRequest(`/calculations/calculation-unit/${deductionId}/`, {
             method: 'DELETE',
           });
-          
           message.success('Deduction deleted successfully');
-          
-          setDeductions(prev => prev.filter(d => d.id !== deductionId));
-          
+
           if (onRefresh) {
-            setTimeout(() => {
-              onRefresh();
-            }, 500);
+            onRefresh();
           }
-          
-          setTimeout(() => {
-            fetchDeductions();
-          }, 600);
         } catch (error) {
           console.error('Error deleting deduction:', error);
           message.error(error.message || 'Failed to delete deduction');
+          fetchDeductions();
         } finally {
           setDeletingId(null);
         }
@@ -508,7 +519,7 @@ const ViewOwnerCalculationDrawer = ({ open, onClose, calculation, currentTheme, 
               </div>
             </div>
           </div>
-          
+
           <div className={`mt-4 pt-4 border-t ${currentTheme === 'dark' ? 'border-white/10' : 'border-black/10'}`}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -525,7 +536,7 @@ const ViewOwnerCalculationDrawer = ({ open, onClose, calculation, currentTheme, 
               </div>
             </div>
           </div>
-          
+
           {calculationsList.some(calc => calc.note) && (
             <div className={`mt-4 pt-4 border-t ${currentTheme === 'dark' ? 'border-white/10' : 'border-black/10'}`}>
               <div className={`text-xs font-medium mb-1 ${currentTheme === 'dark' ? 'text-white/70' : 'text-black/70'}`}>Note</div>
@@ -539,54 +550,62 @@ const ViewOwnerCalculationDrawer = ({ open, onClose, calculation, currentTheme, 
 
         <div>
           <h3 className={`text-lg font-semibold mb-4 ${currentTheme === 'dark' ? 'text-white/85' : 'text-black/85'}`}>Truck Numbers & Driver Information</h3>
-          {statementsOnly.length > 0 ? (
+          {allCalculationUnits.length > 0 ? (
             <div className="space-y-3">
-              {statementsOnly.map((unit, index) => {
+              {allCalculationUnits.map((unit, index) => {
                 const unitNumber = unit.truck?.unit_number || 'N/A';
                 const driverName = unit.driver || unit.statement?.driver || 'N/A';
                 const companyName = unit.statement?.company || unit.truck?.carrier_company || 'N/A';
                 const amount = typeof unit.amount === 'string' ? parseFloat(unit.amount) || 0 : (unit.amount || 0);
                 const escrow = typeof unit.escrow === 'string' ? parseFloat(unit.escrow) || 0 : (unit.escrow || 0);
-                const note = unit.note || 'N/A';
-                const pdfUrl = unit.statement?.pdf_file || null;
+                const note = unit.note || '';
+                const pdfUrl = unit.statement?.pdf_file || unit.statement?.pdf_file_url || null;
+                const hasStatement = unit.statement !== null && unit.statement !== undefined;
+                const isNegative = amount < 0;
 
-                <div className='space-y-3'>
-                  {}
-
-                </div>
-                                
                 const handleDeleteUnit = async () => {
                   if (!unit.id) {
                     message.error('Cannot delete: Unit ID is missing');
                     return;
                   }
 
+                  const isDeduction = unit.statement === null || unit.statement === undefined;
+
                   modal.confirm({
-                    title: 'Delete Unit',
-                    content: `Are you sure you want to delete this unit (${unitNumber})? This action cannot be undone.`,
+                    title: isDeduction ? 'Delete Deduction' : 'Delete Unit',
+                    content: `Are you sure you want to delete this ${isDeduction ? 'deduction' : 'unit'} (${unitNumber})? This action cannot be undone.`,
                     okText: 'Delete',
                     okType: 'danger',
                     cancelText: 'Cancel',
                     onOk: async () => {
+                      setDeletingId(unit.id);
+                      setDeletedUnitIds(prev => new Set([...prev, unit.id]));
+
+                      if (isDeduction) {
+                        setDeductions(prev => prev.filter(d => d.id !== unit.id));
+                      }
+
                       try {
-                        setDeletingId(unit.id);
                         await apiRequest(`/calculations/calculation-unit/${unit.id}/`, {
                           method: 'DELETE',
                         });
-                        message.success('Unit deleted successfully');
-                        
-                        // Refresh the parent component
+                        message.success(`${isDeduction ? 'Deduction' : 'Unit'} deleted successfully`);
+                        queryClient.invalidateQueries({ queryKey: ['owner'] });
+
                         if (onRefresh) {
-                          setTimeout(() => {
-                            onRefresh();
-                          }, 500);
+                          onRefresh();
                         }
-                        
-                        // Close drawer to force refresh when reopened
-                        onClose();
                       } catch (error) {
                         console.error('Error deleting unit:', error);
-                        message.error(error.message || 'Failed to delete unit');
+                        message.error(error.message || `Failed to delete ${isDeduction ? 'deduction' : 'unit'}`);
+                        setDeletedUnitIds(prev => {
+                          const newSet = new Set(prev);
+                          newSet.delete(unit.id);
+                          return newSet;
+                        });
+                        if (isDeduction) {
+                          fetchDeductions();
+                        }
                       } finally {
                         setDeletingId(null);
                       }
@@ -605,9 +624,7 @@ const ViewOwnerCalculationDrawer = ({ open, onClose, calculation, currentTheme, 
                         loading={deletingId === unit.id}
                         size="small"
                         className={currentTheme === 'dark' ? 'bg-red-600 hover:bg-red-700' : 'bg-red-500 hover:bg-red-600'}
-                      >
-                        Delete
-                      </Button>
+                      />
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                       <div>
@@ -624,12 +641,12 @@ const ViewOwnerCalculationDrawer = ({ open, onClose, calculation, currentTheme, 
                       </div>
                       <div>
                         <div className={`text-xs font-medium mb-1 ${currentTheme === 'dark' ? 'text-white/70' : 'text-black/70'}`}>Amount</div>
-                        <div className={`font-semibold text-lg ${currentTheme === 'dark' ? 'text-green-400' : 'text-green-600'}`}>
+                        <div className={`font-semibold text-lg ${hasStatement ? (currentTheme === 'dark' ? 'text-green-400' : 'text-green-600') : (isNegative ? (currentTheme === 'dark' ? 'text-red-400' : 'text-red-600') : (currentTheme === 'dark' ? 'text-orange-400' : 'text-orange-600'))}`}>
                           {formatCurrency(amount)}
                         </div>
                       </div>
                     </div>
-                    
+
                     <div className={`mt-4 pt-4 border-t ${currentTheme === 'dark' ? 'border-white/10' : 'border-black/10'}`}>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
@@ -640,38 +657,24 @@ const ViewOwnerCalculationDrawer = ({ open, onClose, calculation, currentTheme, 
                         </div>
                         <div>
                           <div className={`text-xs font-medium mb-1 ${currentTheme === 'dark' ? 'text-white/70' : 'text-black/70'}`}>Note</div>
-                          <div className={`font-semibold ${currentTheme === 'dark' ? 'text-white/85' : 'text-black/85'}`}>
-                            {note !== 'N/A' ? note : '-'}
+                          <div className="flex items-start justify-between gap-4">
+                            <div className={`font-semibold flex-1 ${currentTheme === 'dark' ? 'text-white/85' : 'text-black/85'}`}>
+                              {note && note.trim() !== '' ? note : '-'}
+                            </div>
+                            {pdfUrl && (
+                              <a
+                                href={pdfUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className={`flex-shrink-0 inline-block px-4 py-2 rounded ${currentTheme === 'dark' ? 'bg-[#E77843] hover:bg-[#F59A6B]' : 'bg-[#E77843] hover:bg-[#F59A6B]'} text-white font-medium transition-colors text-sm`}
+                              >
+                                View PDF Statement
+                              </a>
+                            )}
                           </div>
                         </div>
                       </div>
                     </div>
-                    
-                    {pdfUrl && (
-                      <div className={`mt-4 pt-4 border-t ${currentTheme === 'dark' ? 'border-white/10' : 'border-black/10'}`}>
-                        <div className={`text-xs font-medium mb-2 ${currentTheme === 'dark' ? 'text-white/70' : 'text-black/70'}`}>
-                          Statement PDF File:
-                        </div>
-                        <div className="flex gap-2">
-                          <a 
-                            href={pdfUrl} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className={`inline-block px-4 py-2 rounded ${currentTheme === 'dark' ? 'bg-[#E77843] hover:bg-[#F59A6B]' : 'bg-[#E77843] hover:bg-[#F59A6B]'} text-white font-medium transition-colors`}
-                          >
-                            View PDF Statement
-                          </a>
-                          <a 
-                            href={pdfUrl} 
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className={`inline-block px-4 py-2 rounded border ${currentTheme === 'dark' ? 'border-[#E77843] text-[#E77843] hover:border-[#F59A6B] hover:text-[#F59A6B] hover:bg-[#F59A6B]/10' : 'border-[#E77843] text-[#E77843] hover:border-[#F59A6B] hover:text-[#F59A6B] hover:bg-[#F59A6B]/5'} font-medium transition-colors`}
-                          >
-                            Download PDF
-                          </a>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 );
               })}
@@ -679,110 +682,7 @@ const ViewOwnerCalculationDrawer = ({ open, onClose, calculation, currentTheme, 
           ) : (
             <div className={`text-center py-10 border-2 border-dashed rounded-xl ${currentTheme === 'dark' ? 'border-white/10 bg-white/5' : 'border-gray-200 bg-gray-50'}`}>
               <div className={`text-sm ${currentTheme === 'dark' ? 'text-white/65' : 'text-black/65'}`}>
-                No revenue loads found for this period.
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className={`text-lg font-semibold ${currentTheme === 'dark' ? 'text-orange-400' : 'text-orange-600'}`}>Adjustments & Deductions</h3>
-            {weekDeductions.length > 0 && (
-              <span className={`px-2 py-1 rounded-full text-xs font-medium ${currentTheme === 'dark' ? 'bg-orange-900/20 text-orange-400' : 'bg-orange-50 text-orange-600'}`}>
-                {weekDeductions.length} Items
-              </span>
-            )}
-          </div>
-          {loadingDeductions ? (
-            <div className="flex justify-center items-center py-8">
-              <Spin size="large" />
-            </div>
-          ) : weekDeductions.length > 0 ? (
-            <div className="space-y-3">
-              {weekDeductions.map((deduction, index) => {
-                const truckId = typeof deduction.truck === 'object' ? deduction.truck?.id : deduction.truck;
-                const truck = trucksMap[truckId] || (typeof deduction.truck === 'object' ? deduction.truck : null);
-                const unitNumber = truck?.unit_number || deduction.truck?.unit_number || (truckId ? `Truck ${truckId}` : 'N/A');
-                const driverName = deduction.driver || deduction.driver_name || 'No Driver Assigned';
-                const amount = typeof deduction.amount === 'string' ? parseFloat(deduction.amount) || 0 : (deduction.amount || 0);
-                const escrow = typeof deduction.escrow === 'string' ? parseFloat(deduction.escrow) || 0 : (deduction.escrow || 0);
-                const note = deduction.note || '';
-                const isNegative = amount < 0;
-                
-                console.log('🎯 Rendering deduction card:', {
-                  deductionId: deduction.id,
-                  truckId: truckId,
-                  hasTruckInMap: !!trucksMap[truckId],
-                  unitNumber: unitNumber,
-                  driverName: driverName,
-                  amount: amount,
-                  escrow: escrow,
-                  note: note
-                });
-                
-                return (
-                  <div 
-                    key={deduction.id || index} 
-                    className={`p-4 rounded-xl border transition-all relative ${
-                      isNegative 
-                        ? currentTheme === 'dark' 
-                          ? 'bg-red-900/20 border-red-800/30 hover:border-red-700/50' 
-                          : 'bg-red-50/30 border-red-100 hover:border-red-200'
-                        : currentTheme === 'dark'
-                          ? 'bg-orange-900/20 border-orange-800/30 hover:border-orange-700/50'
-                          : 'bg-orange-50/30 border-orange-100 hover:border-orange-200'
-                    }`}
-                  >
-                    <Button
-                      type="text"
-                      danger
-                      icon={<DeleteOutlined />}
-                      loading={deletingId === deduction.id}
-                      onClick={() => handleDeleteDeduction(deduction.id)}
-                      className="absolute top-2 right-2"
-                      size="small"
-                    />
-                    
-                    <div className="flex justify-between items-start pr-8">
-                      <div className="space-y-1">
-                        <div className={`font-semibold text-lg ${currentTheme === 'dark' ? 'text-white/85' : 'text-black/85'}`}>
-                          Unit: {unitNumber}
-                        </div>
-                        <div className={`text-xs ${currentTheme === 'dark' ? 'text-white/60' : 'text-gray-500'}`}>
-                          {driverName}
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className={`font-semibold text-lg ${isNegative ? (currentTheme === 'dark' ? 'text-red-400' : 'text-red-600') : (currentTheme === 'dark' ? 'text-orange-400' : 'text-orange-600')}`}>
-                          {formatCurrency(amount)}
-                        </div>
-                        {escrow !== 0 && (
-                          <div className={`text-xs font-medium mt-1 ${currentTheme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>
-                            Escrow: {formatCurrency(escrow)}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    
-                    {note && note.trim() !== '' && (
-                      <div className={`mt-3 p-3 rounded-lg border ${currentTheme === 'dark' ? 'bg-white/5 border-white/10' : 'bg-white/80 border-gray-100'}`}>
-                        <div className={`text-xs font-medium mb-1 ${currentTheme === 'dark' ? 'text-white/50' : 'text-gray-400'}`}>
-                          Deduction Reason
-                        </div>
-                        <div className={`text-sm ${currentTheme === 'dark' ? 'text-white/85' : 'text-gray-600'}`}>
-                          {note}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className={`text-center py-10 border-2 border-dashed rounded-xl ${currentTheme === 'dark' ? 'border-white/10 bg-white/5' : 'border-gray-200 bg-gray-50'}`}>
-              <div className={`text-sm ${currentTheme === 'dark' ? 'text-white/65' : 'text-black/65'}`}>
-                No deductions or adjustments recorded for this week.
+                No units found for this period.
               </div>
             </div>
           )}

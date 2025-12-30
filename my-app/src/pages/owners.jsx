@@ -1,15 +1,15 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { Card, Select, DatePicker, Button, Spin, Empty, App, Pagination } from 'antd';
-import { PlusOutlined, EyeOutlined, EditOutlined } from '@ant-design/icons';
+import { EditOutlined, EyeOutlined, PlusOutlined } from '@ant-design/icons';
+import { App, Button, Card, DatePicker, Empty, Pagination, Select, Spin } from 'antd';
 import dayjs from 'dayjs';
 import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
-import { useTheme } from '../menu';
-import { apiRequest, getAuthToken } from '../api';
-import CreateOwnerDrawer from '../CreateOwnerDrawer';
-import ViewOwnerCalculationDrawer from '../ViewOwnerCalculationDrawer';
-import DeductionDrawer from '../DeductionDrawer';
+import React, { useEffect, useState } from 'react';
+import { apiRequest } from '../api';
 import { OwerForm } from '../components/OwerComponent/OwerForm';
+import { Owner } from '../components/OwerComponent/Owner';
+import DeductionDrawer from '../DeductionDrawer';
+import { useTheme } from '../menu';
+import ViewOwnerCalculationDrawer from '../ViewOwnerCalculationDrawer';
 
 dayjs.extend(isSameOrAfter);
 dayjs.extend(isSameOrBefore);
@@ -32,6 +32,8 @@ const Owners = () => {
   const [pageSize, setPageSize] = useState(5);
   const currentTheme = useTheme();
 
+  console.log('ownerData', ownerData);
+
   useEffect(() => {
         const defaultOwners = ['Yulduz', 'Sohib', 'Bobur'];
         setOwners(defaultOwners);
@@ -52,33 +54,33 @@ const Owners = () => {
 
   const fetchOwnerData = async () => {
     if (!selectedOwner) return;
-    
+
     setLoadingData(true);
     try {
       const ownerName = typeof selectedOwner === 'string' ? selectedOwner : (selectedOwner.name || selectedOwner.owner || selectedOwner);
       const ownerCalcParams = new URLSearchParams({
         search: ownerName,
       });
-      
+
       if (dateRange && dateRange[0] && dateRange[1]) {
         const [startDate, endDate] = dateRange;
         ownerCalcParams.append('start_date', startDate.format('YYYY-MM-DD'));
         ownerCalcParams.append('end_date', endDate.format('YYYY-MM-DD'));
       }
-      
+
       console.log('Fetching data for owner:', ownerName, 'with params:', ownerCalcParams.toString());
-      
+
       const ownerCalcResult = await apiRequest(`/calculations/owner-calculation/?${ownerCalcParams.toString()}`).catch(err => {
         console.error('Error fetching owner calculation:', err);
         return null;
       });
-      
+
       console.log('Owner calculation API response:', ownerCalcResult);
       console.log('Owner calculation API response type:', typeof ownerCalcResult);
       console.log('Owner calculation API response isArray:', Array.isArray(ownerCalcResult));
-      
+
       let dataToProcess = null;
-      
+
       if (ownerCalcResult) {
         if (ownerCalcResult.results && Array.isArray(ownerCalcResult.results)) {
           console.log('Using ownerCalcResult.results, length:', ownerCalcResult.results.length);
@@ -92,29 +94,29 @@ const Owners = () => {
       } else {
         console.log('ownerCalcResult is null or undefined');
       }
-      
+
       console.log('Data to process before filtering:', dataToProcess);
       console.log('Data to process type:', typeof dataToProcess);
       console.log('Data to process isArray:', Array.isArray(dataToProcess));
-      
+
       if (dataToProcess && Array.isArray(dataToProcess)) {
         const filteredData = dataToProcess.filter(item => {
           if (!item) return false;
-          
+
           const itemOwner = item.owner ? String(item.owner).trim() : '';
           const selectedOwnerStr = String(ownerName).trim();
-          
-          const ownerMatches = itemOwner.toLowerCase() === selectedOwnerStr.toLowerCase() || 
+
+          const ownerMatches = itemOwner.toLowerCase() === selectedOwnerStr.toLowerCase() ||
                          itemOwner === selectedOwnerStr;
-          
+
           if (!ownerMatches) {
             console.log('Owner mismatch:', { itemOwner, selectedOwnerStr });
             return false;
           }
-          
+
           return ownerMatches;
         });
-        
+
         console.log('Filtered data:', filteredData);
         dataToProcess = filteredData;
       }
@@ -141,15 +143,15 @@ const Owners = () => {
 
   const extractTruckNumber = (item) => {
     if (!item) return 'N/A';
-    
+
     if (item.truck && typeof item.truck === 'object' && item.truck.unit_number) {
       return String(item.truck.unit_number);
       }
-    
+
     if (item.unit_number) {
       return String(item.unit_number);
     }
-    
+
     return 'N/A';
   };
 
@@ -187,35 +189,35 @@ const Owners = () => {
 
   const extractCalculationInfo = (item) => {
     if (!item) return null;
-    
+
     const id = item.id || 'N/A';
     const startDate = item.start_date || 'N/A';
     const endDate = item.end_date || 'N/A';
-    
+
     let unitNumber = 'N/A';
     if (item.truck && item.truck.unit_number) {
       unitNumber = String(item.truck.unit_number);
     } else if (item.unit_number) {
       unitNumber = String(item.unit_number);
     }
-    
+
     let driverName = 'N/A';
     if (item.statement && item.statement.driver) {
       driverName = String(item.statement.driver);
     } else if (item.driver) {
       driverName = typeof item.driver === 'string' ? item.driver : 'N/A';
       }
-    
+
     let companyName = 'N/A';
     if (item.statement && item.statement.company) {
       companyName = String(item.statement.company);
     } else if (item.truck && item.truck.carrier_company) {
       companyName = String(item.truck.carrier_company);
     }
-    
+
     const amount = item.amount || 0;
     const escrow = item.escrow || 0;
-    
+
     const driverInfo = {
       id: item.driver_id || 'N/A',
       name: driverName,
@@ -241,11 +243,11 @@ const Owners = () => {
 
   const getTrucksAndDriversFromOwnerCalculation = (data) => {
     if (!data) return [];
-    
+
     const results = [];
-    
+
     let dataArray = [];
-    
+
     if (Array.isArray(data)) {
       dataArray = data;
     } else if (data && typeof data === 'object' && data.calculation_units && Array.isArray(data.calculation_units)) {
@@ -253,40 +255,40 @@ const Owners = () => {
     } else if (data && typeof data === 'object' && data.results && Array.isArray(data.results)) {
       dataArray = data.results;
     }
-    
+
     dataArray.forEach((calculationItem) => {
       if (!calculationItem || !calculationItem.calculation_units || !Array.isArray(calculationItem.calculation_units)) {
         return;
       }
-      
+
       calculationItem.calculation_units.forEach((calculationUnit, index) => {
         if (!calculationUnit) return;
-        
+
         let truckNumber = 'N/A';
         if (calculationUnit.truck && calculationUnit.truck.unit_number) {
           truckNumber = String(calculationUnit.truck.unit_number);
           }
-      
+
         let driverName = 'N/A';
         if (calculationUnit.statement && calculationUnit.statement.driver) {
           driverName = String(calculationUnit.statement.driver);
         } else if (calculationUnit.driver) {
           driverName = String(calculationUnit.driver);
         }
-        
+
         const amount = calculationUnit.amount || 0;
         const escrow = calculationUnit.escrow || 0;
-        
+
         const startDate = calculationItem.start_date || dateRange?.[0]?.format('YYYY-MM-DD') || 'N/A';
         const endDate = calculationItem.end_date || dateRange?.[1]?.format('YYYY-MM-DD') || 'N/A';
-        
+
         let companyName = 'N/A';
         if (calculationUnit.statement && calculationUnit.statement.company) {
           companyName = String(calculationUnit.statement.company);
         } else if (calculationUnit.truck && calculationUnit.truck.carrier_company) {
           companyName = String(calculationUnit.truck.carrier_company);
           }
-        
+
         const driverInfo = {
           id: calculationUnit.driver_id || 'N/A',
           name: driverName,
@@ -295,7 +297,7 @@ const Owners = () => {
           company: companyName !== 'N/A' ? companyName : null,
           carrier: null,
         };
-        
+
         results.push({
           id: calculationUnit.id || calculationItem.id || `calc-${index}`,
           unitNumber: truckNumber,
@@ -310,11 +312,11 @@ const Owners = () => {
         });
       });
     });
-    
+
     if (results.length > 0) {
       return results;
     }
-    
+
     return results;
   };
 
@@ -338,11 +340,12 @@ const Owners = () => {
 
   return (
     <div className="h-full w-full flex flex-col box-border bg-transparent p-6">
-      <div className="flex items-center justify-between mb-5">
-        <h2 className={`mt-0 flex-shrink-0 font-semibold ${currentTheme === 'dark' ? 'text-white/85' : 'text-black/85'}`}>Owners</h2>
-      </div>
-      
-      <div className={`flex flex-col gap-4 mb-6 ${currentTheme === 'dark' ? 'text-white/85' : 'text-black/85'}`}>
+      <div className="flex-shrink-0">
+        <div className="flex items-center justify-between mb-5">
+          <h2 className={`mt-0 flex-shrink-0 font-semibold ${currentTheme === 'dark' ? 'text-white/85' : 'text-black/85'}`}>Owners</h2>
+        </div>
+
+        <div className={`flex flex-col gap-4 mb-6 ${currentTheme === 'dark' ? 'text-white/85' : 'text-black/85'}`}>
         <div className="flex items-center justify-between flex-wrap">
         <div className="flex items-center gap-4 flex-wrap">
           <div className="flex items-center gap-2">
@@ -365,7 +368,7 @@ const Owners = () => {
               })}
             />
           </div>
-          
+
           <div className="flex items-center gap-2">
             <span className="font-medium">Date Range:</span>
             <RangePicker
@@ -401,11 +404,7 @@ const Owners = () => {
             />
           </div>
 
-          {(selectedOwner || dateRange) && (
-            <Button onClick={handleClearFilter} size="small">
-              Clear
-            </Button>
-          )}
+
         </div>
 
         <div className="flex gap-2">
@@ -419,8 +418,10 @@ const Owners = () => {
           </Button>
             </div>
           </div>
+        </div>
       </div>
 
+      <div className="flex-1 overflow-hidden flex flex-col min-h-0">
       {loadingData ? (
         <div className="flex justify-center items-center h-full">
           <Spin size="large" />
@@ -428,46 +429,35 @@ const Owners = () => {
       ) : !selectedOwner ? (
         <Empty description={<span className={currentTheme === 'dark' ? 'text-white/65' : 'text-black/65'}>Please select an owner to view calculations</span>} />
       ) : ownerData ? (
-        <div className="flex flex-col gap-6 flex-1 overflow-auto">
+        <div className="flex flex-col gap-6 flex-1 overflow-y-auto min-h-0">
                     {(() => {
                       const dataToUse = ownerCalculationData || ownerData?.ownerCalculation;
             console.log('Display - ownerCalculationData:', ownerCalculationData);
             console.log('Display - ownerData?.ownerCalculation:', ownerData?.ownerCalculation);
             console.log('Display - dataToUse:', dataToUse);
-            
+
             let calculationsList = [];
-            
+
             if (dataToUse && Array.isArray(dataToUse)) {
               calculationsList = dataToUse;
             }
-            
+
             console.log('Display - calculationsList:', calculationsList);
             console.log('Display - calculationsList.length:', calculationsList.length);
-            
+
             const validCalculations = calculationsList.filter(calc => {
               const hasCalculationUnits = calc.calculation_units && Array.isArray(calc.calculation_units) && calc.calculation_units.length > 0;
               const hasTotalAmount = calc.total_amount && parseFloat(calc.total_amount) > 0;
               const hasTotalEscrow = calc.total_escrow && parseFloat(calc.total_escrow) !== 0;
-              
+
               return hasCalculationUnits || hasTotalAmount || hasTotalEscrow;
             });
-            
+
             console.log('Display - validCalculations:', validCalculations);
             console.log('Display - validCalculations.length:', validCalculations.length);
-            
-            if (validCalculations.length === 0) {
-              return (
-            <Card
-                  title={<span className={currentTheme === 'dark' ? 'text-white/85' : 'text-black/85'}>Owner Calculation</span>}
-              className={`${currentTheme === 'dark' ? 'bg-white/5 border-white/10' : 'bg-white border-black/10'}`}
-            >
-                  <Empty description={<span className={currentTheme === 'dark' ? 'text-white/65' : 'text-black/65'}>No owner calculations found for the selected criteria</span>} />
-                </Card>
-              );
-            }
-            
+
             const ownerName = validCalculations[0]?.owner || selectedOwner || 'N/A';
-            
+
             let globalOwnerId = 'N/A';
             for (const calc of validCalculations) {
               if (calc.id) {
@@ -475,7 +465,7 @@ const Owners = () => {
                 break;
               }
             }
-            
+
             if (globalOwnerId === 'N/A' && selectedOwner) {
               const ownerFromList = owners.find(o => {
                 const ownerValue = typeof o === 'string' ? o : (o.name || o.owner);
@@ -485,8 +475,7 @@ const Owners = () => {
                 globalOwnerId = String(ownerFromList.id);
               }
             }
-            
-            // Deduplicate calculations by ID to prevent duplicate cards
+
             const uniqueCalculations = [];
             const seenCalculationIds = new Set();
             validCalculations.forEach(calc => {
@@ -494,39 +483,37 @@ const Owners = () => {
                 seenCalculationIds.add(calc.id);
                 uniqueCalculations.push(calc);
               } else if (!calc.id) {
-                // Include calculations without ID (shouldn't happen, but just in case)
                 uniqueCalculations.push(calc);
               }
             });
-            
+
             const groupedByPeriod = {};
             uniqueCalculations.forEach(calc => {
               const periodKeyString = `${calc.start_date || 'N/A'}_${calc.end_date || 'N/A'}`;
               if (!groupedByPeriod[periodKeyString]) {
                 groupedByPeriod[periodKeyString] = [];
               }
-              // Check if this calculation already exists in this period group
               const exists = groupedByPeriod[periodKeyString].some(existingCalc => existingCalc.id === calc.id);
               if (!exists) {
                 groupedByPeriod[periodKeyString].push(calc);
               }
             });
-            
+
             const periods = Object.keys(groupedByPeriod)
               .filter(periodKeyString => {
                 const periodCalcs = groupedByPeriod[periodKeyString];
                 if (!periodCalcs || periodCalcs.length === 0) {
                   return false;
                 }
-                
+
                 const hasData = periodCalcs.some(calc => {
                   const hasCalculationUnits = calc.calculation_units && Array.isArray(calc.calculation_units) && calc.calculation_units.length > 0;
                   const hasTotalAmount = calc.total_amount && parseFloat(calc.total_amount) > 0;
                   const hasTotalEscrow = calc.total_escrow && parseFloat(calc.total_escrow) !== 0;
-                  
+
                   return hasCalculationUnits || hasTotalAmount || hasTotalEscrow;
                 });
-                
+
                 return hasData;
               })
               .map(periodKeyString => {
@@ -545,23 +532,11 @@ const Owners = () => {
                 }
                 return 0;
               });
-            
-            if (periods.length === 0) {
-                        return (
-                <Card
-                  title={<span className={currentTheme === 'dark' ? 'text-white/85' : 'text-black/85'}>Owner Calculation</span>}
-                  className={`${currentTheme === 'dark' ? 'bg-white/5 border-white/10' : 'bg-white border-black/10'}`}
-                >
-                  <Empty description={<span className={currentTheme === 'dark' ? 'text-white/65' : 'text-black/65'}>No owner calculations found for the selected criteria</span>} />
-                </Card>
-              );
-            }
-            
-            // Calculate pagination
+
             const startIndex = (currentPage - 1) * pageSize;
             const endIndex = startIndex + pageSize;
             const paginatedPeriods = periods.slice(startIndex, endIndex);
-                          
+
                               return (
               <div className="space-y-4">
                 {paginatedPeriods.map((periodKey, periodIndex) => {
@@ -569,21 +544,21 @@ const Owners = () => {
                   if (!periodCalcs || periodCalcs.length === 0) {
                     return null;
                   }
-                  
+
                   const firstCalc = periodCalcs[0];
                   const periodStartDate = firstCalc?.start_date || 'N/A';
                   const periodEndDate = firstCalc?.end_date || 'N/A';
-                  
+
                   let totalPeriodGross = 0;
                   let totalPeriodEscrow = 0;
                   let totalPrevAmount = 0;
                   let createdByNames = new Set();
-                  
+
                   periodCalcs.forEach(calc => {
                     totalPeriodGross += parseFloat(calc.total_amount || 0);
                     totalPeriodEscrow += parseFloat(calc.total_escrow || 0);
                     totalPrevAmount += parseFloat(calc.prev_amount || 0);
-                    
+
                     if (calc.created_by) {
                       let createdByName = 'N/A';
                       if (typeof calc.created_by === 'string') {
@@ -598,9 +573,9 @@ const Owners = () => {
                       }
                     }
                   });
-                  
+
                   const createdByDisplay = Array.from(createdByNames).join(', ') || 'N/A';
-                  
+
                   const getCreatedByName = (calc) => {
                     if (calc.created_by) {
                       if (typeof calc.created_by === 'string') {
@@ -613,26 +588,25 @@ const Owners = () => {
                     }
                     return 'N/A';
                   };
-                  
+
                   const findPreviousWeek = (currentStartDate, currentEndDate) => {
                     if (!currentStartDate || !currentEndDate) return null;
-                    
+
                     const currentStart = dayjs(currentStartDate);
                     const prevEnd = currentStart.subtract(1, 'day');
                     const prevStart = prevEnd.subtract(6, 'day');
-                    
+
                     const prevStartStr = prevStart.format('YYYY-MM-DD');
                     const prevEndStr = prevEnd.format('YYYY-MM-DD');
-                    
+
                     return validCalculations.find(calc => {
                       const calcStart = calc.start_date ? dayjs(calc.start_date).format('YYYY-MM-DD') : null;
                       const calcEnd = calc.end_date ? dayjs(calc.end_date).format('YYYY-MM-DD') : null;
                       return calcStart === prevStartStr && calcEnd === prevEndStr && calc.owner === (firstCalc.owner || ownerName);
                     });
                   };
-                  
-                        // Show one card per calculation (not per unit)
-                        // Deduplicate calculations by ID to ensure only one card per calculation
+
+
                         const uniqueCalcs = [];
                         const seenCalcIds = new Set();
                         periodCalcs.forEach(calc => {
@@ -641,16 +615,16 @@ const Owners = () => {
                             uniqueCalcs.push(calc);
                           }
                         });
-                        
+
                         if (uniqueCalcs.length === 0) {
                           return null;
                         }
-                        
+
                         return (
                           <div key={periodKey.id || periodKey.key} className="space-y-3">
                             {uniqueCalcs.map((calc, calcIndex) => {
                               const calcCreatedBy = getCreatedByName(calc);
-                          
+
                               return (
                                 <Card
                                   key={calc.id || calcIndex}
@@ -696,7 +670,7 @@ const Owners = () => {
                                         type="primary"
                                         icon={<EyeOutlined />}
                                         onClick={() => {
-                                          setSelectedCalculation({ 
+                                          setSelectedCalculation({
                                             ...calc,
                                             calculations: [calc],
                                             owner: calc.owner || ownerName,
@@ -719,8 +693,7 @@ const Owners = () => {
                                             message.warning('Please select an owner first.');
                                             return;
                                           }
-                                          
-                                          // Extract owner ID from calculation_units
+
                                           let ownerId = null;
                                           if (calc.calculation_units && Array.isArray(calc.calculation_units) && calc.calculation_units.length > 0) {
                                             const firstUnit = calc.calculation_units[0];
@@ -728,8 +701,8 @@ const Owners = () => {
                                               ownerId = firstUnit.owner;
                                             }
                                           }
-                                          
-                                          setSelectedCalculation({ 
+
+                                          setSelectedCalculation({
                                             ...calc,
                                             calculations: [calc],
                                             owner: calc.owner || ownerName,
@@ -753,7 +726,7 @@ const Owners = () => {
                           </div>
                         );
                 })}
-                
+
                 {periods.length > 0 && (
                   <div className="flex justify-center mt-6 pb-4">
                     <Pagination
@@ -766,17 +739,12 @@ const Owners = () => {
                           setPageSize(size);
                           setCurrentPage(1);
                         }
-                        // Scroll to top when page changes
-                        window.scrollTo({ top: 0, behavior: 'smooth' });
                       }}
                       onShowSizeChange={(current, size) => {
                         setPageSize(size);
                         setCurrentPage(1);
-                        // Scroll to top when page size changes
-                        window.scrollTo({ top: 0, behavior: 'smooth' });
                       }}
                       showSizeChanger
-                      showQuickJumper
                       showTotal={(total, range) => (
                         <span className={currentTheme === 'dark' ? 'text-white/70' : 'text-black/70'}>
                           Showing {range[0]}-{range[1]} of {total} {total === 1 ? 'period' : 'periods'}
@@ -794,7 +762,7 @@ const Owners = () => {
                 ) : (
         <Empty description={<span className={currentTheme === 'dark' ? 'text-white/65' : 'text-black/65'}>No data available for the selected owner and date range</span>} />
                 )}
-      
+
       <ViewOwnerCalculationDrawer
         open={viewDrawerOpen}
         onClose={() => {
@@ -819,7 +787,7 @@ const Owners = () => {
           }
           const ownerName = selectedCalculation?.owner || selectedOwner;
           const ownerId = selectedCalculation?.owner_id || selectedCalculation?.id;
-          setSelectedCalculation({ 
+          setSelectedCalculation({
             ...selectedCalculation,
             owner: ownerName,
             owner_id: ownerId,
@@ -831,25 +799,14 @@ const Owners = () => {
           setDeductionDrawerOpen(true);
         }}
       />
-      
-      
-      <CreateOwnerDrawer
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        onSuccess={() => {
-          if (selectedOwner) {
-            setTimeout(() => {
-              fetchOwnerData();
-            }, 500);
-          }
-        }}
-        owners={owners}
-      />
 
-      {/* <OwerForm
+
+      <Owner   selectedOwner={selectedOwner} setViewDrawerOpen={setViewDrawerOpen} setDeductionDrawerOpen={setDeductionDrawerOpen} setSelectedCalculation={setSelectedCalculation} currentTheme={currentTheme} search={selectedOwner} start_date={dateRange[0].format('YYYY-MM-DD')} end_date={dateRange[1].format('YYYY-MM-DD')} onRefresh={fetchOwnerData} />
+
+      <OwerForm
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-      /> */}
+      />
 
       <DeductionDrawer
         open={deductionDrawerOpen}
@@ -857,8 +814,17 @@ const Owners = () => {
           setDeductionDrawerOpen(false);
           setSelectedCalculation(null);
         }}
-        onSuccess={() => {
-          // Just refresh the data without creating new cards
+        onSuccess={(newDeduction) => {
+          if (selectedCalculation && newDeduction) {
+            const updatedCalculation = {
+              ...selectedCalculation,
+              calculation_units: [
+                ...(selectedCalculation.calculation_units || []),
+                newDeduction
+              ]
+            };
+            setSelectedCalculation(updatedCalculation);
+          }
           if (selectedOwner) {
             setTimeout(() => {
               fetchOwnerData();
@@ -867,8 +833,9 @@ const Owners = () => {
         }}
         calculation={selectedCalculation}
       />
+      </div>
     </div>
-  );  
+  );
 };
 export default Owners;
 

@@ -55,7 +55,7 @@ const Analytics = () => {
 
   const fetchAnalytics = async () => {
     if (!selectedOwner || !dateRange || !dateRange[0] || !dateRange[1]) return;
-    
+
     setLoading(true);
     try {
       const [startDate, endDate] = dateRange;
@@ -65,7 +65,7 @@ const Analytics = () => {
         start_date: startDate.format('YYYY-MM-DD'),
         end_date: endDate.format('YYYY-MM-DD'),
       });
-      
+
       const result = await apiRequest(`/calculations/analytics?${params.toString()}`);
       setAnalyticsData(result);
     } catch (err) {
@@ -110,7 +110,7 @@ const Analytics = () => {
   return (
     <div className="h-full w-full flex flex-col box-border bg-transparent p-6">
       <h2 className={`mb-5 mt-0 flex-shrink-0 font-semibold ${currentTheme === 'dark' ? 'text-white/85' : 'text-black/85'}`}>Analytics</h2>
-      
+
       <div className={`flex items-center gap-4 mb-6 ${currentTheme === 'dark' ? 'text-white/85' : 'text-black/85'}`}>
         <div className="flex items-center gap-2">
           <span className="font-medium min-w-[80px]">Owner:</span>
@@ -132,7 +132,7 @@ const Analytics = () => {
             })}
           />
         </div>
-        
+
         <div className="flex items-center gap-2">
           <span className="font-medium">Date Range:</span>
           <RangePicker
@@ -189,7 +189,7 @@ const Analytics = () => {
                       const truckId = truck.truck_id || truck.id || truck._id || index;
                       const truckAmount = truck.truck_amount || truck.amount || 0;
                       const truckEscrow = truck.truck_escrow || truck.escrow || 0;
-                      
+
                       return (
                         <div
                           key={index}
@@ -232,16 +232,7 @@ const Analytics = () => {
             </div>
           </Card>
 
-          <Card
-            title={<span className={currentTheme === 'dark' ? 'text-white/85' : 'text-black/85'}>Raw Analytics Data</span>}
-            className={`${currentTheme === 'dark' ? 'bg-white/5 border-white/10' : 'bg-white border-black/10'}`}
-          >
-            <div className={`${currentTheme === 'dark' ? 'text-white/85' : 'text-black/85'}`}>
-              <pre className="whitespace-pre-wrap text-xs bg-white/5 p-4 rounded max-h-96 overflow-auto">
-                {JSON.stringify(analyticsData, null, 2)}
-              </pre>
-            </div>
-          </Card>
+          
         </div>
       ) : (
         <Empty description={<span className={currentTheme === 'dark' ? 'text-white/65' : 'text-black/65'}>No analytics data available for the selected owner and date range</span>} />
