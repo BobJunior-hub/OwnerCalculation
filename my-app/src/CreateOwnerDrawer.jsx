@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Drawer, Form, Input, DatePicker, Button, Select, InputNumber, App, Spin, Empty, Modal } from 'antd';
-import { TruckOutlined, CloseOutlined, SaveOutlined, DeleteOutlined, PlusOutlined, LoadingOutlined } from '@ant-design/icons';
-import dayjs from 'dayjs';
-import { useTheme } from './menu';
+import { CloseOutlined, DeleteOutlined, LoadingOutlined, PlusOutlined, SaveOutlined, TruckOutlined } from '@ant-design/icons';
+import { useQueryClient } from '@tanstack/react-query';
+import { App, Button, DatePicker, Drawer, Input, InputNumber, Select, Spin } from 'antd';
+import React, { useEffect, useRef, useState } from 'react';
 import { apiRequest, getAuthToken } from './api';
+import { useTheme } from './menu';
 
 const { RangePicker } = DatePicker;
 const { TextArea } = Input;
@@ -19,6 +19,7 @@ const CreateOwnerDrawer = ({ open, onClose, onSuccess, owners }) => {
   const [trucksData, setTrucksData] = useState([]);
   const [loadingDrivers, setLoadingDrivers] = useState({});
   const currentTheme = useTheme();
+  const queryClient = useQueryClient();
   const bottomRef = useRef(null);
 
   useEffect(() => {
@@ -442,6 +443,7 @@ const CreateOwnerDrawer = ({ open, onClose, onSuccess, owners }) => {
         message.success(
           `Calculation updated! Added ${newUnits.length} new unit(s).`
         );
+        setTrucksData([]);
       } else {
         const postPayload = {
         owner: selectedOwner,
@@ -457,6 +459,9 @@ const CreateOwnerDrawer = ({ open, onClose, onSuccess, owners }) => {
           });
 
           message.success('Calculation created successfully!');
+          setTrucksData([]);
+          queryClient.invalidateQueries({ queryKey: ['owner'] });
+
         } catch (postError) {
           const isAlreadyExistsError = postError?.message?.includes('already exists') ||
                                      postError?.response?.error?.includes('already exists') ||
@@ -496,9 +501,8 @@ const CreateOwnerDrawer = ({ open, onClose, onSuccess, owners }) => {
                   body: JSON.stringify(updatePayload),
                 }
               );
-
-
               message.success(`Calculation updated! Added ${newUnits.length} new unit(s) in batch.`);
+
             } else {
               throw postError;
             }
@@ -752,7 +756,7 @@ const CreateOwnerDrawer = ({ open, onClose, onSuccess, owners }) => {
                               <label className={`text-xs font-medium mb-1 block ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>
                                 Total Amount
                               </label>
-                              <InputNumber
+                              <Input
                                 className="w-full"
                                 value={data.amount}
                                 onChange={(value) => updateTruckData(data.truckId, 'amount', value ? String(value) : '')}
@@ -762,7 +766,7 @@ const CreateOwnerDrawer = ({ open, onClose, onSuccess, owners }) => {
                                 formatter={(value) => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
                                 parser={(value) => value.replace(/\$\s?|(,*)/g, '')}
                                 style={{ color: currentTheme === 'dark' ? '#4ade80' : '#16a34a' }}
-                              />
+                                required={true}/>
                             </div>
                             <div>
                               <label className={`text-xs font-medium mb-1 block ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>

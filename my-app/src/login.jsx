@@ -26,10 +26,9 @@ export default function LoginPage() {
       }
 
       const { token, user } = await login(identifier, password);
-      
-      const userData = user ? { ...user } : {};
-      userData.username = identifier;
-      
+
+      const userData = user || { username: identifier };
+
       if (remember) {
         setAuthToken(token, true);
         localStorage.removeItem("user");
@@ -40,7 +39,7 @@ export default function LoginPage() {
         sessionStorage.setItem("user", JSON.stringify(userData));
       }
 
-        navigate("/menu");
+        navigate("/analytics");
     } catch (err) {
       setErrorMsg(err.message || "Something went wrong");
     } finally {
@@ -72,6 +71,6 @@ export default function LoginPage() {
         </form>
       </div>
     </div>
-    
+
   );
 }

@@ -1,8 +1,7 @@
-import React, { useState, useEffect, createContext, useContext } from 'react';
-import { TeamOutlined, LogoutOutlined, UserOutlined, MoonOutlined, SunOutlined, MenuFoldOutlined, MenuUnfoldOutlined, BarChartOutlined } from '@ant-design/icons';
-import { Menu, Switch, Layout, Typography, Avatar, Button, Space, ConfigProvider } from 'antd';
-import { theme as antdTheme } from 'antd';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { BarChartOutlined, LogoutOutlined, MenuFoldOutlined, MenuUnfoldOutlined, MoonOutlined, SunOutlined, TeamOutlined, UserOutlined } from '@ant-design/icons';
+import { theme as antdTheme, Avatar, Button, ConfigProvider, Layout, Menu, Modal, Space, Switch, Typography } from 'antd';
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { removeAuthToken } from './api';
 
 const { Header, Sider, Content } = Layout;
@@ -21,7 +20,7 @@ const DashboardLayout = ({ children }) => {
 
   useEffect(() => {
     const loadUserData = () => {
-      const userData = localStorage.getItem('user') || sessionStorage.getItem('user');
+      const userData = sessionStorage.getItem('user');
       if (userData) {
         try {
           const parsedUser = JSON.parse(userData);
@@ -38,23 +37,26 @@ const DashboardLayout = ({ children }) => {
   const [current, setCurrent] = useState(() => {
     if (location.pathname === '/owners') return 'owners';
     if (location.pathname === '/analytics') return 'analytics';
-    if (location.pathname === '/menu') return '';
-    return '';
+    return 'analytics';
   });
 
   useEffect(() => {
-    if (location.pathname === '/owners') setCurrent('owners');
-    else if (location.pathname === '/analytics') setCurrent('analytics');
-    else if (location.pathname === '/menu') setCurrent('');
-  }, [location.pathname]);
-  
+    if (location.pathname === '/owners') {
+      setCurrent('owners');
+    } else if (location.pathname === '/analytics') {
+      setCurrent('analytics');
+    } else if (location.pathname === '/menu') {
+      navigate('/analytics');
+    }
+  }, [location.pathname, navigate]);
+
   const changeTheme = (checked) => {
     setTheme(checked ? 'dark' : 'light');
   };
-  
+
       const onClick = (e) => {
         setCurrent(e.key);
-        
+
         if (e.key === 'owners') {
           navigate('/owners');
         } else if (e.key === 'analytics') {
@@ -63,8 +65,17 @@ const DashboardLayout = ({ children }) => {
       };
 
   const handleLogout = () => {
-    removeAuthToken();
-    navigate('/');
+    Modal.confirm({
+      title: 'Confirm Logout',
+      content: 'Are you sure you want to logout?',
+      okText: 'Logout',
+      okType: 'danger',
+      cancelText: 'Cancel',
+      onOk: () => {
+        removeAuthToken();
+        navigate('/');
+      },
+    });
   };
 
   const items = [
@@ -87,9 +98,9 @@ const DashboardLayout = ({ children }) => {
     <ThemeContext.Provider value={theme}>
       <ConfigProvider theme={antdConfigTheme}>
       <Layout className="min-h-screen w-screen">
-        <Sider 
-          trigger={null} 
-          collapsible 
+        <Sider
+          trigger={null}
+          collapsible
           collapsed={collapsed}
           className="bg-[#E77843] overflow-hidden fixed left-4 top-4 bottom-4 rounded-xl flex flex-col"
           style={{ height: 'calc(100vh - 32px)' }}
@@ -106,7 +117,7 @@ const DashboardLayout = ({ children }) => {
             <div className="w-8 h-8 bg-white/20 rounded flex items-center justify-center text-white font-bold">D</div>
           )}
         </div>
-        
+
         <div className="flex-1 overflow-y-auto overflow-x-hidden">
           <ConfigProvider theme={{
             components: {
@@ -143,7 +154,7 @@ const DashboardLayout = ({ children }) => {
                     {user?.username || 'User'}
                   </Text>
                   <Text type="secondary" className="text-xs text-white/70">
-                    {user?.user_type || user?.type || user?.role || ''}
+                    {user?.department || ''}
                   </Text>
                 </div>
               )}
@@ -162,8 +173,8 @@ const DashboardLayout = ({ children }) => {
         </div>
       </Sider>
 
-      <Layout className={`transition-all duration-200 min-h-screen ${collapsed ? 'ml-24' : 'ml-[266px]'}`} style={{ width: collapsed ? 'calc(100vw - 96px)' : 'calc(100vw - 266px)' }}>
-        <Header className="px-6 bg-[#E77843] flex items-center justify-between border-b border-white/10 rounded-xl m-4 mt-4 mb-0" style={{ width: 'calc(100% - 32px)' }}>
+      <Layout className={`transition-all duration-200 fixed top-0 right-0 bottom-0 ${collapsed ? 'left-24' : 'left-[266px]'}`} style={{ width: collapsed ? 'calc(100vw - 96px)' : 'calc(100vw - 266px)' }}>
+        <Header className="px-6 bg-[#E77843] flex items-center justify-between border-b border-white/10 rounded-xl m-4 mt-4 mb-0 flex-shrink-0" style={{ width: 'calc(100% - 32px)' }}>
           <Button
             type="text"
             icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
@@ -177,13 +188,13 @@ const DashboardLayout = ({ children }) => {
             <Switch
               checked={theme === 'dark'}
               onChange={changeTheme}
-              checkedChildren={<MoonOutlined />}
-              unCheckedChildren={<SunOutlined />}
+              checkedChildren={<SunOutlined />}
+              unCheckedChildren={ <MoonOutlined />}
             />
           </Space>
         </Header>
-        <Content className={`m-0 p-0 h-screen overflow-hidden ${theme === 'dark' ? 'bg-[#141414]' : 'bg-gray-100'}`}>
-          <div className="p-0 h-[calc(100vh-4rem)] w-full box-border overflow-hidden flex flex-col">
+        <Content className={`m-0 p-0 overflow-hidden flex flex-col ${theme === 'dark' ? 'bg-[#141414]' : 'bg-gray-100'}`} style={{ height: 'calc(100vh - 4rem - 32px)', marginTop: '0' }}>
+          <div className="p-0 h-full w-full box-border overflow-hidden flex flex-col">
             {children}
           </div>
         </Content>
@@ -194,31 +205,5 @@ const DashboardLayout = ({ children }) => {
   );
 };
 
-const DashboardHome = () => {
-  const theme = useTheme();
-  
-  return (
-    <div className="h-[calc(100vh-4rem)] w-full p-6 flex flex-col box-border">
-      <Title level={2} className={`mb-6 ${theme === 'dark' ? 'text-white/85' : 'text-black/85'}`}>
-        Welcome to Dashboard
-      </Title>
-      <Text className={`text-base ${theme === 'dark' ? 'text-white/65' : 'text-black/65'}`}>
-        Select a menu item from the sidebar to get started.
-      </Text>
-    </div>
-  );
-};
-
-const MyMenu = () => {
-  return (
-    <DashboardLayout>
-      <div className="h-full w-full flex flex-col items-center justify-center p-6">
-        <h1 className="text-3xl font-bold mb-4">Welcome to Dashboard</h1>
-        <p className="text-lg">Select a menu item from the sidebar to get started.</p>
-      </div>
-    </DashboardLayout>
-  );
-};
-
-export default MyMenu;
 export { DashboardLayout, ThemeContext };
+

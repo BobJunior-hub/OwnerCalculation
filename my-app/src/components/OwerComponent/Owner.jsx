@@ -2,6 +2,7 @@ import { DeleteOutlined, EditOutlined, EyeOutlined } from '@ant-design/icons';
 import { App, Button, Card, Empty, Pagination, Spin } from 'antd';
 import React, { useEffect, useState } from 'react';
 import { apiRequest } from '../../api';
+import { useUsers } from '../../hooks/users';
 import { useGetOwner } from '../../services/query/useGetOwner';
 
 export const Owner = ({ currentTheme, search, start_date, end_date, setViewDrawerOpen, setDeductionDrawerOpen, setSelectedCalculation, selectedOwner, onRefresh }) => {
@@ -10,6 +11,7 @@ export const Owner = ({ currentTheme, search, start_date, end_date, setViewDrawe
   const [pageSize, setPageSize] = useState(10);
   const [calculations, setCalculations] = useState([]);
   const [deletingId, setDeletingId] = useState(null);
+  const{isOwnerDepartment} = useUsers();
 
 
   const { data: ownerData, isLoading, isError } = useGetOwner({
@@ -91,18 +93,20 @@ export const Owner = ({ currentTheme, search, start_date, end_date, setViewDrawe
     });
   };
 
+
+  if(isLoading)
+    return (
+      <div className="flex justify-center items-center h-full">
+      <Spin size="large" />
+    </div>
+    )
   return (
     <div className='flex flex-col h-full'>
       <div className='flex-1 overflow-y-auto min-h-0'>
-        {isLoading ? (
-          <div className="flex justify-center items-center h-full">
-            <Spin size="large" />
-          </div>
-        ) : displayCalculations.length === 0 ? (
+        {  displayCalculations.length === 0 && !isLoading ? (
           <Card
             title={<span className={currentTheme === 'dark' ? 'text-white/85' : 'text-black/85'}>Owner Calculation</span>}
-            className={`${currentTheme === 'dark' ? 'bg-white/5 border-white/10' : 'bg-white border-black/10'}`}
-          >
+            className={`${currentTheme === 'dark' ? 'bg-white/5 border-white/10' : 'bg-white border-black/10'}`}>
             <Empty description={<span className={currentTheme === 'dark' ? 'text-white/65' : 'text-black/65'}>No owner calculations found for the selected criteria</span>} />
           </Card>
         ) : (
@@ -110,7 +114,7 @@ export const Owner = ({ currentTheme, search, start_date, end_date, setViewDrawe
             {displayCalculations.map((owner) => (
               <Card
                 key={owner.id}
-                title={<span className={currentTheme === 'dark' ? 'text-white/85' : 'text-black/85'}>Owner Calculation - {start_date} to {end_date}</span>}
+                title={<span className={currentTheme === 'dark' ? 'text-white/85' : 'text-black/85'}>Owner Calculation -  {owner.start_date} to {owner.end_date}</span>}
                 className={`${currentTheme === 'dark' ? 'bg-white/5 border-white/10' : 'bg-white border-black/10'}`}>
 
                 <div className={`p-4 rounded ${currentTheme === 'dark' ? 'bg-white/5' : 'bg-white'} border ${currentTheme === 'dark' ? 'border-white/10' : 'border-black/10'} flex items-center justify-between mb-4`}>
@@ -124,19 +128,19 @@ export const Owner = ({ currentTheme, search, start_date, end_date, setViewDrawe
                     </div>
                     <div>
                       <div className={`text-xs font-medium mb-1 ${currentTheme === 'dark' ? 'text-white/70' : 'text-black/70'}`}>Total Amount</div>
-                      <div className={`font-semibold text-xl ${currentTheme === 'dark' ? 'text-green-400' : 'text-green-600'}`}>
+                      <div className={`font-semibold text-xl ${(owner.total_amount || 0) < 0 ? (currentTheme === 'dark' ? 'text-red-400' : 'text-red-600') : (currentTheme === 'dark' ? 'text-green-400' : 'text-green-600')}`}>
                         {formatCurrency(owner.total_amount || 0)}
                       </div>
                     </div>
                     <div>
                       <div className={`text-xs font-medium mb-1 ${currentTheme === 'dark' ? 'text-white/70' : 'text-black/70'}`}>Total Escrow</div>
-                      <div className={`font-semibold text-xl ${currentTheme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>
+                      <div className={`font-semibold text-xl ${(owner.total_escrow || 0) < 0 ? (currentTheme === 'dark' ? 'text-red-400' : 'text-red-600') : (currentTheme === 'dark' ? 'text-green-400' : 'text-green-600')}`}>
                         {formatCurrency(owner.total_escrow || 0)}
                       </div>
                     </div>
                     <div>
                       <div className={`text-xs font-medium mb-1 ${currentTheme === 'dark' ? 'text-white/70' : 'text-black/70'}`}>Previous Amount</div>
-                      <div className={`font-semibold text-xl ${currentTheme === 'dark' ? 'text-purple-400' : 'text-purple-600'}`}>
+                      <div className={`font-semibold text-xl ${(owner.prev_amount || 0) < 0 ? (currentTheme === 'dark' ? 'text-red-400' : 'text-red-600') : (currentTheme === 'dark' ? 'text-green-400' : 'text-green-600')}`}>
                         {formatCurrency(owner.prev_amount || 0)}
                       </div>
                     </div>
@@ -164,6 +168,7 @@ export const Owner = ({ currentTheme, search, start_date, end_date, setViewDrawe
                         setViewDrawerOpen(true);}}className={currentTheme === 'dark' ? 'bg-[#E77843] hover:bg-[#F59A6B]' : 'bg-[#E77843] hover:bg-[#F59A6B]'}>
                       View
                     </Button>
+                    {!isOwnerDepartment &&(
                     <Button
                       type="primary"
                       icon={<EditOutlined />}
@@ -196,6 +201,11 @@ export const Owner = ({ currentTheme, search, start_date, end_date, setViewDrawe
                        className={currentTheme === 'dark' ? 'bg-[#E77843] hover:bg-[#F59A6B]' : 'bg-[#E77843] hover:bg-[#F59A6B]'}>
                       Add
                     </Button>
+                  )}
+
+
+
+                    {!isOwnerDepartment &&(
                     <Button
                       type="primary"
                       danger
@@ -206,10 +216,10 @@ export const Owner = ({ currentTheme, search, start_date, end_date, setViewDrawe
                         currentTheme === 'dark'
                           ? 'bg-red-600 hover:bg-red-700'
                           : 'bg-red-500 hover:bg-red-600'
-                      }
-                    >
+                      }>
                       Delete
                     </Button>
+                    )}
                   </div>
                 </div>
               </Card>

@@ -1,4 +1,5 @@
 import { CloseOutlined, DeleteOutlined, LoadingOutlined, PlusOutlined, SaveOutlined, TruckOutlined } from '@ant-design/icons';
+import { useQueryClient } from '@tanstack/react-query';
 import { App, Button, DatePicker, Drawer, Input, InputNumber, Select } from 'antd';
 import dayjs from 'dayjs';
 import React from 'react';
@@ -11,6 +12,7 @@ const { TextArea } = Input;
 export const OwerForm = ({ open, onClose, onSuccess }) => {
   const { message } = App.useApp();
   const currentTheme = useTheme();
+  const queryClient = useQueryClient();
   const {
     Options,
     addTruck,
@@ -33,6 +35,8 @@ export const OwerForm = ({ open, onClose, onSuccess }) => {
     await handleSubmit(
       (successMsg) => {
         message.success(successMsg);
+        resetForm();
+        queryClient.invalidateQueries({ queryKey: ['owner'] });
         if (onSuccess) onSuccess();
         onClose();
       },
@@ -43,6 +47,8 @@ export const OwerForm = ({ open, onClose, onSuccess }) => {
   };
 
   const handleClose = () => {
+    resetForm();
+    queryClient.invalidateQueries({ queryKey: ['owner'] });
     onClose();
   };
 
@@ -114,7 +120,17 @@ export const OwerForm = ({ open, onClose, onSuccess }) => {
                   className="w-full"
                   format="YYYY-MM-DD"
                   value={startDateForPicker}
-                  onChange={(date) => setStart_date(date ? dayjs(date).format('YYYY-MM-DD') : null)}
+                  onChange={(date) => {
+                    if (date) {
+                      const startDateStr = dayjs(date).format('YYYY-MM-DD');
+                      setStart_date(startDateStr);
+                      const endDate = dayjs(date).add(6, 'day');
+                      setEnd_date(endDate.format('YYYY-MM-DD'));
+                    } else {
+                      setStart_date(null);
+                      setEnd_date(null);
+                    }
+                  }}
                 />
               </div>
 
@@ -232,18 +248,43 @@ export const OwerForm = ({ open, onClose, onSuccess }) => {
                         </div>
                         <div>
                           <label className={`text-xs font-medium mb-1 block ${currentTheme === 'dark' ? 'text-white/50' : 'text-black/50'}`}>
-                            Total Amount
+                            Total Amount <span className="text-red-500">*</span>
                           </label>
                           <InputNumber
                             className="w-full"
-                            value={data.totalAmount}
-                            onChange={(value) => updateTruckData(data.truckId, 'totalAmount', value ? String(value) : '')}
+                            value={data.totalAmount ? parseFloat(data.totalAmount) : null}
+                            onChange={(value) => {
+                              if (value === null || value === undefined) {
+                                updateTruckData(data.truckId, 'totalAmount', '');
+                                return;
+                              }
+                              if (typeof value === 'number' && !isNaN(value)) {
+                                updateTruckData(data.truckId, 'totalAmount', String(value));
+                              }
+                            }}
                             placeholder="Enter amount"
-                            min={0}
                             step={0.01}
-                            formatter={(value) => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                            parser={(value) => value.replace(/\$\s?|(,*)/g, '')}
-                            style={{ color: currentTheme === 'dark' ? '#4ade80' : '#16a34a' }}
+                            controls={true}
+                            keyboard={true}
+                            formatter={(value) => {
+                              if (!value && value !== 0) return '';
+                              const numValue = typeof value === 'string' ? parseFloat(value.replace(/[^0-9.-]/g, '')) : value;
+                              if (isNaN(numValue)) return '';
+                              return `$ ${numValue}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+                            }}
+                            parser={(value) => {
+                              if (!value) return '';
+                              const cleaned = value.replace(/[^0-9.-]/g, '');
+                              const num = parseFloat(cleaned);
+                              return isNaN(num) ? '' : cleaned;
+                            }}
+                            onKeyPress={(e) => {
+                              const char = String.fromCharCode(e.which || e.keyCode);
+                              if (!/[0-9.-]/.test(char) && !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.key)) {
+                                e.preventDefault();
+                              }
+                            }}
+                            style={{ color: currentTheme === 'dark' ? '#4ade80' : '#16a34a', width: '100%' }}
                           />
                         </div>
                         <div>
@@ -252,10 +293,20 @@ export const OwerForm = ({ open, onClose, onSuccess }) => {
                           </label>
                           <InputNumber
                             className="w-full"
-                            value={data.escrow}
-                            onChange={(value) => updateTruckData(data.truckId, 'escrow', value !== null && value !== undefined ? String(value) : '')}
+                            value={data.escrow ? parseFloat(data.escrow) : null}
+                            onChange={(value) => {
+                              if (value === null || value === undefined) {
+                                updateTruckData(data.truckId, 'escrow', '');
+                                return;
+                              }
+                              if (typeof value === 'number' && !isNaN(value)) {
+                                updateTruckData(data.truckId, 'escrow', String(value));
+                              }
+                            }}
                             placeholder="Enter escrow (can be positive or negative)"
                             step={0.01}
+                            controls={true}
+                            keyboard={true}
                             formatter={(value) => {
                               if (!value && value !== 0) return '';
                               const num = parseFloat(value);
@@ -266,9 +317,17 @@ export const OwerForm = ({ open, onClose, onSuccess }) => {
                             }}
                             parser={(value) => {
                               if (!value) return '';
-                              return value.replace(/\$\s?|(,*)/g, '');
+                              const cleaned = value.replace(/[^0-9.-]/g, '');
+                              const num = parseFloat(cleaned);
+                              return isNaN(num) ? '' : cleaned;
                             }}
-                            style={{ color: currentTheme === 'dark' ? '#60a5fa' : '#2563eb' }}
+                            onKeyPress={(e) => {
+                              const char = String.fromCharCode(e.which || e.keyCode);
+                              if (!/[0-9.-]/.test(char) && !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.key)) {
+                                e.preventDefault();
+                              }
+                            }}
+                            style={{ color: currentTheme === 'dark' ? '#60a5fa' : '#2563eb', width: '100%' }}
                           />
                         </div>
                         {data.pdf && (

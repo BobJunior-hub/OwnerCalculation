@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { App, Button, Drawer } from 'antd';
 import React, { useEffect, useState } from 'react';
 import { apiRequest } from './api';
+import { useUsers } from './hooks/users';
 
 const ViewOwnerCalculationDrawer = ({ open, onClose, calculation, currentTheme, onRefresh }) => {
   const { message, modal } = App.useApp();
@@ -13,6 +14,7 @@ const ViewOwnerCalculationDrawer = ({ open, onClose, calculation, currentTheme, 
   const [deletedUnitIds, setDeletedUnitIds] = useState(new Set());
   const [newlyAddedUnits, setNewlyAddedUnits] = useState([]);
   const queryClient = useQueryClient();
+  const { isOwnerDepartment } = useUsers();
 
   useEffect(() => {
     const fetchTrucks = async () => {
@@ -521,10 +523,10 @@ const ViewOwnerCalculationDrawer = ({ open, onClose, calculation, currentTheme, 
           </div>
 
           <div className={`mt-4 pt-4 border-t ${currentTheme === 'dark' ? 'border-white/10' : 'border-black/10'}`}>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <div className={`text-xs font-medium mb-1 ${currentTheme === 'dark' ? 'text-white/70' : 'text-black/70'}`}>Total Gross</div>
-                <div className={`font-semibold text-xl ${currentTheme === 'dark' ? 'text-green-400' : 'text-green-600'}`}>
+                <div className={`font-semibold text-xl ${(calculation.total_amount || 0) < 0 ? (currentTheme === 'dark' ? 'text-red-400' : 'text-red-600') : (currentTheme === 'dark' ? 'text-green-400' : 'text-green-600')}`}>
                   {formatCurrency(calculation.total_amount || 0)}
                 </div>
               </div>
@@ -532,6 +534,12 @@ const ViewOwnerCalculationDrawer = ({ open, onClose, calculation, currentTheme, 
                 <div className={`text-xs font-medium mb-1 ${currentTheme === 'dark' ? 'text-white/70' : 'text-black/70'}`}>Total Escrow</div>
                 <div className={`font-semibold text-xl ${currentTheme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>
                   {formatCurrency(calculation.total_escrow || 0)}
+                </div>
+              </div>
+              <div>
+                <div className={`text-xs font-medium mb-1 ${currentTheme === 'dark' ? 'text-white/70' : 'text-black/70'}`}>Previous Amount</div>
+                <div className={`font-semibold text-xl ${(calculation.prev_amount || 0) < 0 ? (currentTheme === 'dark' ? 'text-red-400' : 'text-red-600') : (currentTheme === 'dark' ? 'text-purple-400' : 'text-purple-600')}`}>
+                  {formatCurrency(calculation.prev_amount || 0)}
                 </div>
               </div>
             </div>
@@ -616,6 +624,7 @@ const ViewOwnerCalculationDrawer = ({ open, onClose, calculation, currentTheme, 
                 return (
                   <div key={unit.id || index} className={`p-4 rounded ${currentTheme === 'dark' ? 'bg-white/5' : 'bg-white'} border ${currentTheme === 'dark' ? 'border-white/10' : 'border-black/10'} relative`}>
                     <div className="absolute top-4 right-4">
+                      {!isOwnerDepartment && (
                       <Button
                         type="primary"
                         danger
@@ -625,6 +634,7 @@ const ViewOwnerCalculationDrawer = ({ open, onClose, calculation, currentTheme, 
                         size="small"
                         className={currentTheme === 'dark' ? 'bg-red-600 hover:bg-red-700' : 'bg-red-500 hover:bg-red-600'}
                       />
+                      )}
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                       <div>
@@ -641,7 +651,7 @@ const ViewOwnerCalculationDrawer = ({ open, onClose, calculation, currentTheme, 
                       </div>
                       <div>
                         <div className={`text-xs font-medium mb-1 ${currentTheme === 'dark' ? 'text-white/70' : 'text-black/70'}`}>Amount</div>
-                        <div className={`font-semibold text-lg ${hasStatement ? (currentTheme === 'dark' ? 'text-green-400' : 'text-green-600') : (isNegative ? (currentTheme === 'dark' ? 'text-red-400' : 'text-red-600') : (currentTheme === 'dark' ? 'text-orange-400' : 'text-orange-600'))}`}>
+                        <div className={`font-semibold text-lg ${amount < 0 ? (currentTheme === 'dark' ? 'text-red-400' : 'text-red-600') : (currentTheme === 'dark' ? 'text-green-400' : 'text-green-600')}`}>
                           {formatCurrency(amount)}
                         </div>
                       </div>

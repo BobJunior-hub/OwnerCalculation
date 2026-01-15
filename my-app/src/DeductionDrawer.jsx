@@ -1,9 +1,9 @@
 import { CloseOutlined, SaveOutlined } from '@ant-design/icons';
+import { useQueryClient } from '@tanstack/react-query';
 import { App, Button, Drawer, Form, Input, InputNumber, Select, Spin } from 'antd';
 import React, { useEffect, useState } from 'react';
 import { apiRequest, getAuthToken } from './api';
 import { useTheme } from './menu';
-import { useQueryClient } from '@tanstack/react-query';
 import { useGetTrucks } from './services/query/useGetTrucks';
 const { TextArea } = Input;
 
@@ -213,15 +213,18 @@ const DeductionDrawer = ({ open, onClose, onSuccess, calculation }) => {
 
     setLoading(true);
     try {
-      const truck = allTrucks.find(t => {
-        const tId = t.id || t._id;
-        return String(tId) === String(values.truck);
-      });
+      let truck = null;
+      if (values.truck) {
+        truck = allTrucks.find(t => {
+          const tId = t.id || t._id;
+          return String(tId) === String(values.truck);
+        });
 
-      if (!truck) {
-        message.error('Truck not found');
-        setLoading(false);
-        return;
+        if (!truck) {
+          message.error('Truck not found');
+          setLoading(false);
+          return;
+        }
       }
 
       let amountValue = 0;
@@ -251,7 +254,6 @@ const DeductionDrawer = ({ open, onClose, onSuccess, calculation }) => {
       }
 
       const payload = {
-        truck: Number(values.truck),
         owner: Number(ownerId),
         driver: values.driver || '',
         amount: amountValue,
@@ -259,13 +261,16 @@ const DeductionDrawer = ({ open, onClose, onSuccess, calculation }) => {
         start_date: calculation.start_date,
         end_date: calculation.end_date,
       };
+
+      if (values.truck) {
+        payload.truck = Number(values.truck);
+      }
 
       if (values.note && values.note.trim()) {
         payload.note = values.note.trim();
       }
 
       const calculationUnitPayload = {
-        truck: Number(values.truck),
         owner: Number(ownerId),
         driver: values.driver || '',
         amount: amountValue,
@@ -273,6 +278,10 @@ const DeductionDrawer = ({ open, onClose, onSuccess, calculation }) => {
         start_date: calculation.start_date,
         end_date: calculation.end_date,
       };
+
+      if (values.truck) {
+        calculationUnitPayload.truck = Number(values.truck);
+      }
 
       if (values.note && values.note.trim()) {
         calculationUnitPayload.note = values.note.trim();
@@ -384,11 +393,12 @@ const DeductionDrawer = ({ open, onClose, onSuccess, calculation }) => {
         <Form.Item
           name="truck"
           label={<span className={currentTheme === 'dark' ? 'text-white/70' : 'text-black/70'}>Truck ID</span>}
-          rules={[{ required: true, message: 'Please select a truck' }]}>
+        >
           <Select
             loading={isLoading}
-            placeholder="Select Truck"
+            placeholder="Select Truck (optional)"
             showSearch
+            allowClear
             filterOption={(input, option) =>
               (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
             }

@@ -338,6 +338,27 @@ export const useOwner = () => {
       return;
     }
 
+    for (const item of trucksData) {
+      const amountField = item.totalAmount || item.amount || "";
+      if (!amountField || amountField === "" || amountField === "0" || amountField === 0) {
+        if (onError) onError(`Total Amount is required and cannot be 0 for Unit ${item.unitNumber || item.truckId}.`);
+        return;
+      }
+
+      let amountValue = 0;
+      if (typeof amountField === "string") {
+        const cleaned = amountField.replace(/[^0-9.-]/g, "");
+        amountValue = parseFloat(cleaned) || 0;
+      } else {
+        amountValue = parseFloat(amountField) || 0;
+      }
+
+      if (amountValue === 0 || isNaN(amountValue)) {
+        if (onError) onError(`Total Amount is required and cannot be 0 for Unit ${item.unitNumber || item.truckId}.`);
+        return;
+      }
+    }
+
     try {
       setIsSubmitting(true);
 
@@ -464,7 +485,7 @@ export const useOwner = () => {
     trucks.forEach((truck) => {
       const truckId = truck.id || truck._id;
       if (!selectedTruckIds.has(truckId)) {
-        Options.push({
+      Options.push({
           label: `${truck.unit_number || "N/A"}-${
             truck.VIN || truck.vin || "N/A"
           }`,

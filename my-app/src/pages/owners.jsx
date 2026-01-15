@@ -1,5 +1,5 @@
 import { EditOutlined, EyeOutlined, PlusOutlined } from '@ant-design/icons';
-import { App, Button, Card, DatePicker, Empty, Pagination, Select, Spin } from 'antd';
+import { App, Button, Card, DatePicker, Pagination, Select } from 'antd';
 import dayjs from 'dayjs';
 import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
 import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
@@ -20,7 +20,23 @@ const Owners = () => {
   const { message } = App.useApp();
   const [owners, setOwners] = useState([]);
   const [selectedOwner, setSelectedOwner] = useState(null);
-  const [dateRange, setDateRange] = useState([dayjs(), dayjs().add(6, 'day')]);
+
+  const getStoredDateRange = () => {
+    try {
+      const stored = localStorage.getItem('sharedDateRange');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed && parsed[0] && parsed[1]) {
+          return [dayjs(parsed[0]), dayjs(parsed[1])];
+        }
+      }
+    } catch (e) {
+      console.error('Error loading date range from localStorage:', e);
+    }
+    return [dayjs(), dayjs().add(6, 'day')];
+  };
+
+  const [dateRange, setDateRange] = useState(getStoredDateRange());
       const [ownerData, setOwnerData] = useState(null);
   const [loadingData, setLoadingData] = useState(false);
   const [ownerCalculationData, setOwnerCalculationData] = useState(null);
@@ -30,21 +46,60 @@ const Owners = () => {
   const [selectedCalculation, setSelectedCalculation] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
+  const [currentUser, setCurrentUser] = useState(null);
   const currentTheme = useTheme();
 
-  console.log('ownerData', ownerData);
+  const getCurrentUser = () => {
+    try {
+      const userStr =  sessionStorage.getItem('user');
+      if (userStr) {
+        return JSON.parse(userStr);
+      }
+    } catch (e) {
+      console.error('Error loading user data:', e);
+    }
+    return null;
+  };
 
   useEffect(() => {
-        const defaultOwners = ['Yulduz', 'Sohib', 'Bobur'];
-        setOwners(defaultOwners);
-    if (!selectedOwner && defaultOwners.length > 0) {
-      setSelectedOwner(defaultOwners[0]);
-    }
+    const user = getCurrentUser();
+    setCurrentUser(user);
+  }, []);
+
+  const isOwnerDepartment = currentUser?.department?.toLowerCase() === 'owner';
+  const ownerUsername = currentUser?.username || null;
+
+
+  console.log('currentUser:', currentUser);
+  console.log('currentUser?.department:', currentUser?.department);
+  console.log('currentUser?.department?.toLowerCase():', currentUser?.department?.toLowerCase());
+  console.log('isOwnerDepartment:', isOwnerDepartment);
+  console.log('ownerUsername:', ownerUsername);
+
+
+  useEffect(() => {
+    const defaultOwners = ['Yulduz', 'Sohib', 'Bobur'];
+    setOwners(defaultOwners);
   }, []);
 
   useEffect(() => {
+    if (currentUser) {
+      if (currentUser?.department?.toLowerCase() === 'owner' && currentUser?.username) {
+        setSelectedOwner(currentUser.username);
+      } else if (!selectedOwner && !isOwnerDepartment) {
+        const defaultOwners = ['Yulduz', 'Sohib', 'Bobur'];
+        if (defaultOwners.length > 0) {
+          setSelectedOwner(defaultOwners[0]);
+        }
+      }
+    }
+  }, [currentUser, isOwnerDepartment, selectedOwner]);
+
+  console.log('currentUser', currentUser);
+
+  useEffect(() => {
     if (selectedOwner) {
-      setCurrentPage(1); // Reset to first page when owner or date range changes
+      setCurrentPage(1);
       fetchOwnerData();
     } else {
       setOwnerData(null);
@@ -339,97 +394,122 @@ const Owners = () => {
 
 
   return (
-    <div className="h-full w-full flex flex-col box-border bg-transparent p-6">
-      <div className="flex-shrink-0">
-        <div className="flex items-center justify-between mb-5">
-          <h2 className={`mt-0 flex-shrink-0 font-semibold ${currentTheme === 'dark' ? 'text-white/85' : 'text-black/85'}`}>Owners</h2>
-        </div>
+    <div className="h-full w-full flex flex-col box-border bg-transparent overflow-hidden">
+      {!loadingData && (
+        <div className={`flex-shrink-0 sticky top-0 z-50 ${currentTheme === 'dark' ? 'bg-[#141414]' : 'bg-gray-100'} p-6 pb-4`}>
 
-        <div className={`flex flex-col gap-4 mb-6 ${currentTheme === 'dark' ? 'text-white/85' : 'text-black/85'}`}>
-        <div className="flex items-center justify-between flex-wrap">
-        <div className="flex items-center gap-4 flex-wrap">
-          <div className="flex items-center gap-2">
-            <span className="font-medium min-w-[80px]">Owner:</span>
-            <Select
-              placeholder="Select Owner"
-              value={selectedOwner}
-              onChange={setSelectedOwner}
-              style={{ width: '250px' }}
-              showSearch
-              filterOption={(input, option) =>
-                (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-              }
-              options={owners.map((owner) => {
-                const ownerValue = typeof owner === 'string' ? owner : (owner.id || owner.name || owner.ownerName || owner);
-                return {
-                  value: ownerValue,
-                  label: typeof owner === 'string' ? owner : getOwnerName(owner),
-                };
-              })}
-            />
-          </div>
+          <div className={`flex flex-col gap-4 mb-6 ${currentTheme === 'dark' ? 'text-white/85' : 'text-black/85'}`}>
+            <div className="flex items-center justify-between flex-wrap">
+              <div className="flex items-center gap-4 flex-wrap">
+              {!isOwnerDepartment && (
+                <div className="flex items-center gap-2">
+                  <span className="font-medium min-w-[80px]">Owner:</span>
+                  <Select
+                    placeholder="Select Owner"
+                    value={selectedOwner}
+                    onChange={setSelectedOwner}
+                    style={{ width: '250px' }}
+                    showSearch
+                    filterOption={(input, option) =>
+                      (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                    }
+                    options={owners.map((owner) => {
+                      const ownerValue = typeof owner === 'string' ? owner : (owner.id || owner.name || owner.ownerName || owner);
+                      return {
+                        value: ownerValue,
+                        label: typeof owner === 'string' ? owner : getOwnerName(owner),
+                      };
+                    })}
+                  />
+                </div>
+              )}
 
-          <div className="flex items-center gap-2">
-            <span className="font-medium">Date Range:</span>
-            <RangePicker
-              value={dateRange}
-              onChange={(dates) => {
-                if (dates && dates[0]) {
-                  const startDate = dates[0];
-                  if (dates[1]) {
-                    setDateRange([startDate, dates[1]]);
+            <div className="flex items-center gap-2">
+              <span className="font-medium">Date Range:</span>
+              <RangePicker
+                value={dateRange}
+                onChange={(dates) => {
+                  if (dates && dates[0]) {
+                    const startDate = dates[0];
+                    let newDateRange;
+                    if (dates[1]) {
+                      newDateRange = [startDate, dates[1]];
+                    } else {
+                      const endDate = startDate.clone().add(6, 'day');
+                      newDateRange = [startDate, endDate];
+                    }
+                    setDateRange(newDateRange);
+                    try {
+                      localStorage.setItem('sharedDateRange', JSON.stringify([
+                        newDateRange[0].format('YYYY-MM-DD'),
+                        newDateRange[1].format('YYYY-MM-DD')
+                      ]));
+                      window.dispatchEvent(new CustomEvent('dateRangeChanged'));
+                    } catch (e) {
+                      console.error('Error saving date range to localStorage:', e);
+                    }
                   } else {
-                    const endDate = startDate.clone().add(6, 'day');
-                    setDateRange([startDate, endDate]);
+                    setDateRange(null);
+                    localStorage.removeItem('sharedDateRange');
+                    window.dispatchEvent(new CustomEvent('dateRangeChanged'));
                   }
-                } else {
-                  setDateRange(null);
-                }
-              }}
-              onCalendarChange={(dates) => {
-                if (dates && dates[0]) {
-                  const startDate = dates[0];
-                  if (dates[1]) {
-                    setDateRange([startDate, dates[1]]);
+                }}
+                onCalendarChange={(dates) => {
+                  if (dates && dates[0]) {
+                    const startDate = dates[0];
+                    let newDateRange;
+                    if (dates[1]) {
+                      newDateRange = [startDate, dates[1]];
+                    } else {
+                      const endDate = startDate.clone().add(6, 'day');
+                      newDateRange = [startDate, endDate];
+                    }
+                    setDateRange(newDateRange);
+                    try {
+                      localStorage.setItem('sharedDateRange', JSON.stringify([
+                        newDateRange[0].format('YYYY-MM-DD'),
+                        newDateRange[1].format('YYYY-MM-DD')
+                      ]));
+                      window.dispatchEvent(new Event('storage'));
+                    } catch (e) {
+                      console.error('Error saving date range to localStorage:', e);
+                    }
                   } else {
-                    const endDate = startDate.clone().add(6, 'day');
-                    setDateRange([startDate, endDate]);
+                    setDateRange(null);
+                    localStorage.removeItem('sharedDateRange');
+                    window.dispatchEvent(new CustomEvent('dateRangeChanged'));
                   }
-                } else {
-                  setDateRange(null);
-                }
-              }}
-              format="YYYY-MM-DD"
-              style={{ width: '250px' }}
-            />
-          </div>
+                }}
+                format="YYYY-MM-DD"
+                style={{ width: '250px' }}
+              />
+            </div>
 
 
-        </div>
+              </div>
 
-        <div className="flex gap-2">
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={() => setDrawerOpen(true)}
-            className={currentTheme === 'dark' ? 'bg-[#E77843] hover:bg-[#F59A6B]' : 'bg-[#E77843] hover:bg-[#F59A6B]'}
-          >
-            Create
-          </Button>
+              {!isOwnerDepartment && (
+                <div className="flex gap-2">
+                  <Button
+                    type="primary"
+                    icon={<PlusOutlined />}
+                    onClick={() => setDrawerOpen(true)}
+                    className={currentTheme === 'dark' ? 'bg-[#E77843] hover:bg-[#F59A6B]' : 'bg-[#E77843] hover:bg-[#F59A6B]'}>
+                    Create
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         </div>
-      </div>
+      )}
 
-      <div className="flex-1 overflow-hidden flex flex-col min-h-0">
-      {loadingData ? (
-        <div className="flex justify-center items-center h-full">
-          <Spin size="large" />
-        </div>
-      ) : !selectedOwner ? (
-        <Empty description={<span className={currentTheme === 'dark' ? 'text-white/65' : 'text-black/65'}>Please select an owner to view calculations</span>} />
-      ) : ownerData ? (
-        <div className="flex flex-col gap-6 flex-1 overflow-y-auto min-h-0">
+
+      <div className="flex-1 overflow-hidden flex flex-col min-h-0 px-6">
+        { ownerData && (
+          <div className="flex-1 flex flex-col overflow-hidden min-h-0">
+
+            <div className="flex-1 overflow-y-auto min-h-0 pr-2 pb-4">
                     {(() => {
                       const dataToUse = ownerCalculationData || ownerData?.ownerCalculation;
             console.log('Display - ownerCalculationData:', ownerCalculationData);
@@ -454,7 +534,6 @@ const Owners = () => {
             });
 
             console.log('Display - validCalculations:', validCalculations);
-            console.log('Display - validCalculations.length:', validCalculations.length);
 
             const ownerName = validCalculations[0]?.owner || selectedOwner || 'N/A';
 
@@ -626,6 +705,7 @@ const Owners = () => {
                               const calcCreatedBy = getCreatedByName(calc);
 
                               return (
+                                <div>
                                 <Card
                                   key={calc.id || calcIndex}
                                   title={<span className={currentTheme === 'dark' ? 'text-white/85' : 'text-black/85'}>Owner Calculation - {periodStartDate} to {periodEndDate}</span>}
@@ -642,7 +722,7 @@ const Owners = () => {
                                     </div>
                                     <div>
                                         <div className={`text-xs font-medium mb-1 ${currentTheme === 'dark' ? 'text-white/70' : 'text-black/70'}`}>Total Amount</div>
-                                        <div className={`font-semibold text-xl ${currentTheme === 'dark' ? 'text-green-400' : 'text-green-600'}`}>
+                                        <div className={`font-semibold text-xl ${(calc.total_amount || 0) < 0 ? (currentTheme === 'dark' ? 'text-red-400' : 'text-red-600') : (currentTheme === 'dark' ? 'text-green-400' : 'text-green-600')}`}>
                                           {formatCurrency(calc.total_amount || 0)}
                                     </div>
                                     </div>
@@ -685,83 +765,155 @@ const Owners = () => {
                                       >
                                         View
                                       </Button>
-                                      <Button
-                                        type="primary"
-                                        icon={<EditOutlined />}
-                                        onClick={() => {
-                                          if (!selectedOwner) {
-                                            message.warning('Please select an owner first.');
-                                            return;
-                                          }
-
-                                          let ownerId = null;
-                                          if (calc.calculation_units && Array.isArray(calc.calculation_units) && calc.calculation_units.length > 0) {
-                                            const firstUnit = calc.calculation_units[0];
-                                            if (firstUnit.owner && typeof firstUnit.owner === 'number') {
-                                              ownerId = firstUnit.owner;
+                                      {!isOwnerDepartment && (
+                                        <Button
+                                          type="primary"
+                                          icon={<EditOutlined />}
+                                          onClick={() => {
+                                            if (!selectedOwner) {
+                                              message.warning('Please select an owner first.');
+                                              return;
                                             }
-                                          }
 
-                                          setSelectedCalculation({
-                                            ...calc,
-                                            calculations: [calc],
-                                            owner: calc.owner || ownerName,
-                                            owner_id: ownerId || calc.id,
-                                            start_date: calc.start_date,
-                                            end_date: calc.end_date,
-                                            total_amount: calc.total_amount,
-                                            total_escrow: calc.total_escrow
-                                          });
-                                          setDeductionDrawerOpen(true);
-                                        }}
-                                        className={currentTheme === 'dark' ? 'bg-[#E77843] hover:bg-[#F59A6B]' : 'bg-[#E77843] hover:bg-[#F59A6B]'}
-                                      >
-                                        Edit
-                                      </Button>
+                                            let ownerId = null;
+                                            if (calc.calculation_units && Array.isArray(calc.calculation_units) && calc.calculation_units.length > 0) {
+                                              const firstUnit = calc.calculation_units[0];
+                                              if (firstUnit.owner && typeof firstUnit.owner === 'number') {
+                                                ownerId = firstUnit.owner;
+                                              }
+                                            }
+
+                                            setSelectedCalculation({
+                                              ...calc,
+                                              calculations: [calc],
+                                              owner: calc.owner || ownerName,
+                                              owner_id: ownerId || calc.id,
+                                              start_date: calc.start_date,
+                                              end_date: calc.end_date,
+                                              total_amount: calc.total_amount,
+                                              total_escrow: calc.total_escrow
+                                            });
+                                            setDeductionDrawerOpen(true);
+                                          }}
+                                          className={currentTheme === 'dark' ? 'bg-[#E77843] hover:bg-[#F59A6B]' : 'bg-[#E77843] hover:bg-[#F59A6B]'}
+                                        >
+                                          Edit
+                                        </Button>
+                                      )}
                                   </div>
                                 </div>
                                 </Card>
+                                </div>
                               );
                             })}
                           </div>
                         );
                 })}
+              </div>
+            );
+          })()}
+            </div>
 
-                {periods.length > 0 && (
-                  <div className="flex justify-center mt-6 pb-4">
-                    <Pagination
-                      current={currentPage}
-                      pageSize={pageSize}
-                      total={periods.length}
-                      onChange={(page, size) => {
-                        setCurrentPage(page);
-                        if (size !== pageSize) {
-                          setPageSize(size);
-                          setCurrentPage(1);
-                        }
-                      }}
-                      onShowSizeChange={(current, size) => {
+            {(() => {
+              const dataToUse = ownerCalculationData || ownerData?.ownerCalculation;
+              let calculationsList = [];
+              if (dataToUse && Array.isArray(dataToUse)) {
+                calculationsList = dataToUse;
+              }
+
+              const validCalculations = calculationsList.filter(calc => {
+                const hasCalculationUnits = calc.calculation_units && Array.isArray(calc.calculation_units) && calc.calculation_units.length > 0;
+                const hasTotalAmount = calc.total_amount && parseFloat(calc.total_amount) > 0;
+                const hasTotalEscrow = calc.total_escrow && parseFloat(calc.total_escrow) !== 0;
+                return hasCalculationUnits || hasTotalAmount || hasTotalEscrow;
+              });
+
+              const uniqueCalculations = [];
+              const seenCalculationIds = new Set();
+              validCalculations.forEach(calc => {
+                if (calc.id && !seenCalculationIds.has(calc.id)) {
+                  seenCalculationIds.add(calc.id);
+                  uniqueCalculations.push(calc);
+                } else if (!calc.id) {
+                  uniqueCalculations.push(calc);
+                }
+              });
+
+              const groupedByPeriod = {};
+              uniqueCalculations.forEach(calc => {
+                const periodKeyString = `${calc.start_date || 'N/A'}_${calc.end_date || 'N/A'}`;
+                if (!groupedByPeriod[periodKeyString]) {
+                  groupedByPeriod[periodKeyString] = [];
+                }
+                const exists = groupedByPeriod[periodKeyString].some(existingCalc => existingCalc.id === calc.id);
+                if (!exists) {
+                  groupedByPeriod[periodKeyString].push(calc);
+                }
+              });
+
+              const periods = Object.keys(groupedByPeriod)
+                .filter(periodKeyString => {
+                  const periodCalcs = groupedByPeriod[periodKeyString];
+                  if (!periodCalcs || periodCalcs.length === 0) {
+                    return false;
+                  }
+                  const hasData = periodCalcs.some(calc => {
+                    const hasCalculationUnits = calc.calculation_units && Array.isArray(calc.calculation_units) && calc.calculation_units.length > 0;
+                    const hasTotalAmount = calc.total_amount && parseFloat(calc.total_amount) > 0;
+                    const hasTotalEscrow = calc.total_escrow && parseFloat(calc.total_escrow) !== 0;
+                    return hasCalculationUnits || hasTotalAmount || hasTotalEscrow;
+                  });
+                  return hasData;
+                })
+                .map(periodKeyString => {
+                  const periodCalcs = groupedByPeriod[periodKeyString];
+                  const firstCalc = periodCalcs[0];
+                  return {
+                    id: firstCalc.id,
+                    start_date: firstCalc.start_date,
+                    end_date: firstCalc.end_date,
+                    key: periodKeyString
+                  };
+                })
+                .sort((a, b) => {
+                  if (a.start_date && b.start_date) {
+                    return b.start_date.localeCompare(a.start_date);
+                  }
+                  return 0;
+                });
+
+              return periods.length > 0 ? (
+                <div className={`flex-shrink-0 flex justify-center pt-4 pb-2 border-t ${currentTheme === 'dark' ? 'border-white/10 bg-[#141414]' : 'border-black/10 bg-gray-100'} sticky bottom-0`}>
+                  <Pagination
+                    current={currentPage}
+                    pageSize={pageSize}
+                    total={periods.length}
+                    onChange={(page, size) => {
+                      setCurrentPage(page);
+                      if (size !== pageSize) {
                         setPageSize(size);
                         setCurrentPage(1);
-                      }}
-                      showSizeChanger
-                      showTotal={(total, range) => (
-                        <span className={currentTheme === 'dark' ? 'text-white/70' : 'text-black/70'}>
-                          Showing {range[0]}-{range[1]} of {total} {total === 1 ? 'period' : 'periods'}
-                        </span>
-                      )}
-                      pageSizeOptions={['5', '10', '20', '50', '100']}
-                      className={currentTheme === 'dark' ? 'text-white' : ''}
-                    />
-                              </div>
-                            )}
-                        </div>
-                      );
-                    })()}
-                  </div>
-                ) : (
-        <Empty description={<span className={currentTheme === 'dark' ? 'text-white/65' : 'text-black/65'}>No data available for the selected owner and date range</span>} />
-                )}
+                      }
+                    }}
+                    onShowSizeChange={(current, size) => {
+                      setPageSize(size);
+                      setCurrentPage(1);
+                    }}
+                    showSizeChanger
+                    showTotal={(total, range) => (
+                      <span className={currentTheme === 'dark' ? 'text-white/70' : 'text-black/70'}>
+                        Showing {range[0]}-{range[1]} of {total} {total === 1 ? 'period' : 'periods'}
+                      </span>
+                    )}
+                    pageSizeOptions={['5', '10', '20', '50', '100']}
+                    className={currentTheme === 'dark' ? 'text-white' : ''}
+                  />
+                </div>
+              ) : null;
+            })()}
+          </div>
+        )
+                }
 
       <ViewOwnerCalculationDrawer
         open={viewDrawerOpen}
@@ -772,6 +924,7 @@ const Owners = () => {
         calculation={selectedCalculation}
         currentTheme={currentTheme}
         selectedOwner={selectedOwner}
+        isOwnerDepartment={isOwnerDepartment}
         onRefresh={() => {
           if (selectedOwner) {
             fetchOwnerData();
@@ -801,7 +954,9 @@ const Owners = () => {
       />
 
 
-      <Owner   selectedOwner={selectedOwner} setViewDrawerOpen={setViewDrawerOpen} setDeductionDrawerOpen={setDeductionDrawerOpen} setSelectedCalculation={setSelectedCalculation} currentTheme={currentTheme} search={selectedOwner} start_date={dateRange[0].format('YYYY-MM-DD')} end_date={dateRange[1].format('YYYY-MM-DD')} onRefresh={fetchOwnerData} />
+      {!loadingData && (
+        <Owner   selectedOwner={selectedOwner} setViewDrawerOpen={setViewDrawerOpen} setDeductionDrawerOpen={setDeductionDrawerOpen} setSelectedCalculation={setSelectedCalculation} currentTheme={currentTheme} search={selectedOwner} start_date={dateRange[0].format('YYYY-MM-DD')} end_date={dateRange[1].format('YYYY-MM-DD')} onRefresh={fetchOwnerData} />
+      )}
 
       <OwerForm
         open={drawerOpen}
